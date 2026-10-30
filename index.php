@@ -1716,11 +1716,12 @@ button { all:unset; }
   unset($publicCfg['auth_password']);   // rimuovi password/hash
 ?>
 <script>
-  window.__GALLERY_CFG__ = <?php echo json_encode($publicCfg, JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE); ?>;
-  window.__CUR_DIR__ = <?php echo json_encode($relDir, JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE); ?>;
-  window.__SELF__ = <?php echo json_encode($self, JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE); ?>;
+  // Prevent DOM XSS / script breakage when embedding variables in inline script tags
+  window.__GALLERY_CFG__ = <?php echo json_encode($publicCfg, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE); ?>;
+  window.__CUR_DIR__ = <?php echo json_encode($relDir, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE); ?>;
+  window.__SELF__ = <?php echo json_encode($self, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE); ?>;
   window.__AUTH_MODE__ = <?php echo (int)$cfg['auth_mode']; ?>;
-  window.__CSRF__ = <?php echo json_encode($CSRF_TOKEN, JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE); ?>;
+  window.__CSRF__ = <?php echo json_encode($CSRF_TOKEN, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE); ?>;
 </script>
 <header>
   <div class="hdr">
@@ -1874,7 +1875,8 @@ button { all:unset; }
 
 <script>
 (() => {
-  const items = <?php echo json_encode($items, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE); ?>;
+  // Prevent DOM XSS / script breakage when embedding array items in inline script tags
+  const items = <?php echo json_encode($items, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE); ?>;
   const grid = document.getElementById('grid');
   const lb = document.getElementById('lightbox');
   const spinner = document.getElementById('spinner');
