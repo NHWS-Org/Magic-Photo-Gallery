@@ -1,4 +1,11 @@
 <?php
+// === SECURITY HEADERS ===
+if (!headers_sent()) {
+    header('X-Content-Type-Options: nosniff');
+    header('X-Frame-Options: SAMEORIGIN');
+    header('Referrer-Policy: strict-origin-when-cross-origin');
+}
+
 // === CONFIGURAZIONE ===
 $baseDir      = __DIR__;                                            // cartella principale
 $configName   = ".Magic-Photo-Gallery";                             // nome della cartella di configurazione
