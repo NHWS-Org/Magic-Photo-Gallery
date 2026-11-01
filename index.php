@@ -709,7 +709,8 @@ if (isset($_GET['gif_progress'])) {
     header('Content-Type: application/json; charset=utf-8');
     header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
     header('Pragma: no-cache');
-    // if (!auth_ok()) { http_response_code(401); echo json_encode(['ok'=>false,'error'=>'unauthorized']); exit; }
+    // SECURITY: Prevent unauthorized information leakage when gallery requires full authentication
+    if ((int)$cfg['auth_mode'] === 2 && !auth_ok()) { http_response_code(401); echo json_encode(['ok'=>false,'error'=>'unauthorized']); exit; }
     $dirRel = trim(str_replace(['\\'],'/', ltrim($_GET['gif_progress'],'/')));
     if (strpos($dirRel,'..') !== false) { echo json_encode(['ok'=>false]); exit; }
     $ppath = folder_gif_progress_path($dirRel, $thumbsRoot, $prefThumb);
@@ -726,7 +727,8 @@ if (isset($_GET['make_gif'])) {
     header('Content-Type: application/json; charset=utf-8');
     header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
     header('Pragma: no-cache');
-    //if (!auth_ok()) { http_response_code(401); echo json_encode(['ok'=>false,'error'=>'unauthorized']); exit; }
+    // SECURITY: Prevent unauthorized resource exhaustion/DoS and GIF generation when auth_mode == 2
+    if ((int)$cfg['auth_mode'] === 2 && !auth_ok()) { http_response_code(401); echo json_encode(['ok'=>false,'error'=>'unauthorized']); exit; }
     @set_time_limit(0);
     $dirRel = trim(str_replace(['\\'],'/', ltrim($_GET['make_gif'],'/')));
     if (strpos($dirRel,'..') !== false) { echo json_encode(['ok'=>false]); exit; }
@@ -761,6 +763,8 @@ if (isset($_GET['make_gif'])) {
 // === ENDPOINT: EXIF per una immagine (con fallback HEIC/XMP via Imagick) ===
 if (isset($_GET['exif'])) {
     header('Content-Type: application/json; charset=utf-8');
+    // SECURITY: Prevent unauthorized access to photo metadata when auth_mode == 2
+    if ((int)$cfg['auth_mode'] === 2 && !auth_ok()) { http_response_code(401); echo json_encode(['ok'=>false,'error'=>'unauthorized']); exit; }
     $name = basename((string)$_GET['exif']);
     $srcPath = $currentAbs . '/' . $name;
     if (!is_file($srcPath)) { echo json_encode(['ok'=>false,'error'=>'not_found']); exit; }
@@ -983,7 +987,8 @@ if (isset($_GET['diag'])) {
 // === ENDPOINT ASINCRONO: genera una singola thumbnail e ritorna JSON ===
 if (isset($_GET['make_thumb'])) {
     header('Content-Type: application/json; charset=utf-8');
-    //if (!auth_ok()) { http_response_code(401); echo json_encode(['ok'=>false,'error'=>'unauthorized']); exit; }
+    // SECURITY: Prevent unauthorized thumbnail creation and file access when auth_mode == 2
+    if ((int)$cfg['auth_mode'] === 2 && !auth_ok()) { http_response_code(401); echo json_encode(['ok'=>false,'error'=>'unauthorized']); exit; }
     @set_time_limit(0);
     $force = isset($_GET['force']) && $_GET['force'] === '1';
 
