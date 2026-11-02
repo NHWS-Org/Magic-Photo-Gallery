@@ -1341,18 +1341,22 @@ foreach ($dIt as $entry) {
     if (!is_dir($abs)) continue;
     $rel = ltrim(($relDir ? $relDir . '/' : '') . $entry, '/');
     if (is_excluded_dir($entry, $rel)) continue;
-    // Conta elementi interni immediati
-    $imgCount = count(list_images($abs));
+    // Performance optimization (Bolt ⚡): Count immediate images and subdirectories in a single pass.
+    // Avoids redundant scandir(), array allocations, and natsort() overhead from list_images().
+    $imgCount = 0;
     $dirCount = 0;
     $scanInner = @scandir($abs) ?: [];
     foreach ($scanInner as $e2) {
         if ($e2 === '.' || $e2 === '..') continue;
         if ($e2[0] === '.') continue;
         $abs2 = $abs . '/' . $e2;
-        if (!is_dir($abs2)) continue;
-        $rel2 = ltrim(($rel ? $rel . '/' : '') . $e2, '/');
-        if (is_excluded_dir($e2, $rel2)) continue;
-        $dirCount++;
+        if (is_dir($abs2)) {
+            $rel2 = ltrim(($rel ? $rel . '/' : '') . $e2, '/');
+            if (is_excluded_dir($e2, $rel2)) continue;
+            $dirCount++;
+        } elseif (is_file($abs2) && is_image_ext($abs2)) {
+            $imgCount++;
+        }
     }
     // GIF path
     $gifAbs = ($rel === '' ? ($thumbsRoot . '/' . $folderGifName) : ($thumbsRoot . '/' . implode('/', array_map(fn($seg) => $prefFolder.$seg, explode('/', $rel))) . '/' . $folderGifName));
