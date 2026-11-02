@@ -1630,6 +1630,10 @@ header { padding: 12px 16px; font-weight: 600; }
 .nav.prev { left:18px; }
 .nav.next { right:18px; }
 .counter { position:absolute; bottom:16px; left:50%; transform:translateX(-50%); font-size:14px; color:#bbb; }
+.close:focus-visible, .nav:focus-visible, .info:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
 button { all:unset; }
 @media (hover:none){ .card:hover img{transform:none;} }
 .collapsed { display:none !important; }
@@ -1864,13 +1868,13 @@ button { all:unset; }
 </main>
 <?php endif; ?>
 
-<div class="lightbox" id="lightbox" aria-hidden="true">
+<div class="lightbox" id="lightbox" role="dialog" aria-modal="true" aria-label="Visualizzatore foto" aria-hidden="true">
   <div class="spinner" id="spinner" aria-hidden="true"></div>
-  <button class="close" id="btnClose">✕</button>
-  <button class="nav prev" id="btnPrev">❮</button>
+  <button class="close" id="btnClose" aria-label="Chiudi visualizzatore (Esc)">✕</button>
+  <button class="nav prev" id="btnPrev" aria-label="Foto precedente (Freccia sinistra)">❮</button>
   <div class="lb-img-wrap"><img id="lbImg" alt=""></div>
-  <button class="nav next" id="btnNext">❯</button>
-  <button class="info" id="btnInfo" title="Mostra informazioni">ℹ︎</button>
+  <button class="nav next" id="btnNext" aria-label="Foto successiva (Freccia destra)">❯</button>
+  <button class="info" id="btnInfo" title="Mostra informazioni" aria-label="Informazioni e dati EXIF (i)">ℹ︎</button>
   <div class="exif" id="exifPanel" aria-live="polite"></div>
   <div class="counter" id="counter"></div>
 </div>
@@ -2078,9 +2082,14 @@ syncBtn?.addEventListener('click', (e)=>{
   });
 
   // Lightbox
+  let lastFocused = null;
   function openAt(i){
     idx = (i + items.length) % items.length;
+    if (!lb.classList.contains('open')) {
+      lastFocused = document.activeElement;
+    }
     lb.classList.add('open','loading');
+    lb.setAttribute('aria-hidden', 'false');
     spinner.style.display = 'block';
     const src = items[idx].src;
     lbImg.src = '';
@@ -2101,8 +2110,17 @@ syncBtn?.addEventListener('click', (e)=>{
       spinner.style.display = 'none';
     };
     tmp.src = src;
+    setTimeout(() => { btnClose.focus(); }, 0);
   }
-  function closeLb(){ lb.classList.remove('open'); document.body.style.overflow = ''; lbImg.src = ''; }
+  function closeLb(){
+    lb.classList.remove('open');
+    lb.setAttribute('aria-hidden', 'true');
+    document.body.style.overflow = '';
+    lbImg.src = '';
+    if (lastFocused && typeof lastFocused.focus === 'function') {
+      lastFocused.focus();
+    }
+  }
   function prev(){ openAt(idx-1); }
   function next(){ openAt(idx+1); }
 
