@@ -39,7 +39,9 @@ $defaults = [
     'folder_gif_delay_cs'      => 80,            // ritardo di base per frame (centisecondi)
     // Modalità autenticazione: 0=nessun login, 1=login solo per funzioni extra, 2=login per tutto
     'auth_mode'     => 0,
-    'auth_password' => ''   // può essere testo in chiaro o password_hash() ($2y$...)
+    'auth_password' => '',  // può essere testo in chiaro o password_hash() ($2y$...)
+    // Lingua UI: 'auto' (da browser) oppure codice lingua (es. 'it', 'en', 'de')
+    'language'      => 'auto'
 ];
 // Carica o crea .config.json
 $cfg = $defaults;
@@ -102,6 +104,97 @@ $debugFlag = $cfg['debugFlag'];
 $cfg['auth_mode'] = isset($cfg['auth_mode']) ? (int)$cfg['auth_mode'] : 0;
 if ($cfg['auth_mode'] < 0 || $cfg['auth_mode'] > 2) { $cfg['auth_mode'] = 0; }
 $cfg['auth_password'] = isset($cfg['auth_password']) ? (string)$cfg['auth_password'] : '';
+
+// === I18N ===
+// Ordine chiavi: le traduzioni sono array posizionali (nome nativo + stringhe). Placeholder: {dirs} {thumbs} {gifs} {v} {c} {r} {x} {g} {y} {hash}
+function mpg_i18n_keys(): array {
+    return ['login_required','password','enter','wrong_password','home','auth_extra','auth_no','auth_in','menu','purge','purge_t','sync','sync_t','mkhash','logout','login','folders','photos','no_images','viewer','close','prev','next','info','cancel','c_purge_all','c_purge_dir','c_sync_all','c_sync_dir','e_purge','e_sync','e_hash','e_generic','purge_done','sync_done','sync_sum','sync_title','sync_sub','done','enter_pwd','denied','auth_err','hash_prompt','hash_done','exif_na','language','auto','dims','camera','lens','date','focal','aperture','exptime','present'];
+}
+function mpg_i18n_data(): array {
+    return [
+    'en' => ['English','Access required','Password','Enter','Wrong password','Home','Signed in (extra features enabled)','Not signed in (required for extra features)','Signed in','Menu','Clear cache','Delete thumbnails and GIFs of the current folder','Sync cache','Sync cache with the current folder contents','Create hash','Sign out','Sign in','Folders','Photos','No images found.','Photo viewer','Close viewer (Esc)','Previous photo (Left arrow)','Next photo (Right arrow)','Information and EXIF data (i)','Cancel','Delete ALL thumbnails and GIFs of ALL folders?','Delete thumbnails and GIF of the current folder?','Sync the cache on ALL folders? Removes obsolete files and regenerates missing/old thumbnails.','Sync the cache on the current folder? Removes obsolete files and regenerates missing/old thumbnails.','Error clearing cache','Error syncing cache','Error generating hash','Error','Cache cleared.\nFolders: {dirs}\nThumbs: {thumbs}\nGIFs: {gifs}','Sync completed.','Visited {v} folders • thumbnails: {c} created, {r} updated, {x} removed • GIFs: {g} updated, {y} removed','Syncing cache…','Analyzing folders and thumbnails, please wait.','Completed','Enter the password','Access denied','Authentication error','Enter the new password to turn into a hash (it will not be saved automatically):','Hash generated and copied to clipboard:\n\n{hash}\n\nPaste it into ".config.json" under "auth_password".','not available','Language','Auto (browser)','Dimensions','Camera','Lens','Date','Focal length','Aperture','Exposure','present'],
+    'it' => ['Italiano','Accesso richiesto','Password','Entra','Password errata','Home','Accesso eseguito (funzioni extra abilitate)','Non autenticato (richiesto per funzioni extra)','Accesso eseguito','Menu','Pulisci cache','Elimina anteprime e GIF della cartella corrente','Sincronizza cache','Sincronizza cache con il contenuto attuale delle cartelle','Crea hash','Esci','Accedi','Cartelle','Foto','Nessuna immagine trovata.','Visualizzatore foto','Chiudi visualizzatore (Esc)','Foto precedente (Freccia sinistra)','Foto successiva (Freccia destra)','Informazioni e dati EXIF (i)','Annulla','Eliminare TUTTE le anteprime e GIF di TUTTE le cartelle?','Eliminare le anteprime e la GIF della cartella corrente?','Sincronizzare la cache su TUTTE le cartelle? Rimuove file obsoleti e rigenera miniature mancanti/vecchie.','Sincronizzare la cache sulla cartella corrente? Rimuove file obsoleti e rigenera miniature mancanti/vecchie.','Errore nella pulizia cache','Errore nella sincronizzazione cache','Errore nella generazione hash','Errore','Cache pulita.\nCartelle toccate: {dirs}\nThumbs: {thumbs}\nGIF: {gifs}','Sincronizzazione completata.','Visitate {v} cartelle • anteprime: {c} create, {r} aggiornate, {x} rimosse • GIF: {g} aggiornate, {y} rimosse','Sincronizzazione cache…','Analisi cartelle e anteprime, attendere.','Completato','Inserisci la password','Accesso negato','Errore di autenticazione','Inserisci la nuova password da trasformare in hash (non verrà salvata automaticamente):','Hash generato e copiato negli appunti:\n\n{hash}\n\nIncollalo in ".config.json" su "auth_password".','non disponibili','Lingua','Automatica (browser)','Dimensioni','Fotocamera','Obiettivo','Data','Lunghezza focale','Apertura','Esposizione','presente'],
+    'fr' => ['Français','Accès requis','Mot de passe','Entrer','Mot de passe incorrect','Accueil','Connecté (fonctions supplémentaires activées)','Non connecté (requis pour les fonctions supplémentaires)','Connecté','Menu','Vider le cache','Supprimer les miniatures et GIF du dossier actuel','Synchroniser le cache','Synchroniser le cache avec le contenu actuel des dossiers','Créer un hash','Se déconnecter','Se connecter','Dossiers','Photos','Aucune image trouvée.','Visionneuse de photos','Fermer la visionneuse (Échap)','Photo précédente (flèche gauche)','Photo suivante (flèche droite)','Informations et données EXIF (i)','Annuler','Supprimer TOUTES les miniatures et GIF de TOUS les dossiers ?','Supprimer les miniatures et le GIF du dossier actuel ?','Synchroniser le cache sur TOUS les dossiers ? Supprime les fichiers obsolètes et régénère les miniatures manquantes/anciennes.','Synchroniser le cache sur le dossier actuel ? Supprime les fichiers obsolètes et régénère les miniatures manquantes/anciennes.','Erreur lors du vidage du cache','Erreur lors de la synchronisation du cache','Erreur lors de la génération du hash','Erreur','Cache vidé.\nDossiers : {dirs}\nMiniatures : {thumbs}\nGIF : {gifs}','Synchronisation terminée.','{v} dossiers visités • miniatures : {c} créées, {r} mises à jour, {x} supprimées • GIF : {g} mis à jour, {y} supprimés','Synchronisation du cache…','Analyse des dossiers et des miniatures, veuillez patienter.','Terminé','Saisissez le mot de passe','Accès refusé','Erreur d’authentification','Saisissez le nouveau mot de passe à transformer en hash (il ne sera pas enregistré automatiquement) :','Hash généré et copié dans le presse-papiers :\n\n{hash}\n\nCollez-le dans « .config.json » sous « auth_password ».','non disponibles','Langue','Automatique (navigateur)','Dimensions','Appareil','Objectif','Date','Focale','Ouverture','Exposition','présent'],
+    'de' => ['Deutsch','Zugang erforderlich','Passwort','Eintreten','Falsches Passwort','Startseite','Angemeldet (Zusatzfunktionen aktiviert)','Nicht angemeldet (für Zusatzfunktionen erforderlich)','Angemeldet','Menü','Cache leeren','Vorschaubilder und GIFs des aktuellen Ordners löschen','Cache synchronisieren','Cache mit dem aktuellen Ordnerinhalt synchronisieren','Hash erstellen','Abmelden','Anmelden','Ordner','Fotos','Keine Bilder gefunden.','Fotobetrachter','Betrachter schließen (Esc)','Vorheriges Foto (Pfeil links)','Nächstes Foto (Pfeil rechts)','Informationen und EXIF-Daten (i)','Abbrechen','ALLE Vorschaubilder und GIFs ALLER Ordner löschen?','Vorschaubilder und GIF des aktuellen Ordners löschen?','Cache für ALLE Ordner synchronisieren? Entfernt veraltete Dateien und erzeugt fehlende/alte Vorschaubilder neu.','Cache für den aktuellen Ordner synchronisieren? Entfernt veraltete Dateien und erzeugt fehlende/alte Vorschaubilder neu.','Fehler beim Leeren des Caches','Fehler bei der Cache-Synchronisierung','Fehler beim Erstellen des Hashs','Fehler','Cache geleert.\nOrdner: {dirs}\nVorschaubilder: {thumbs}\nGIFs: {gifs}','Synchronisierung abgeschlossen.','{v} Ordner besucht • Vorschaubilder: {c} erstellt, {r} aktualisiert, {x} entfernt • GIFs: {g} aktualisiert, {y} entfernt','Cache wird synchronisiert…','Ordner und Vorschaubilder werden analysiert, bitte warten.','Abgeschlossen','Passwort eingeben','Zugriff verweigert','Authentifizierungsfehler','Neues Passwort eingeben, das in einen Hash umgewandelt werden soll (wird nicht automatisch gespeichert):','Hash erzeugt und in die Zwischenablage kopiert:\n\n{hash}\n\nFüge ihn in „.config.json“ unter „auth_password“ ein.','nicht verfügbar','Sprache','Automatisch (Browser)','Abmessungen','Kamera','Objektiv','Datum','Brennweite','Blende','Belichtungszeit','vorhanden'],
+    'es' => ['Español','Acceso requerido','Contraseña','Entrar','Contraseña incorrecta','Inicio','Sesión iniciada (funciones extra habilitadas)','Sin sesión (necesaria para funciones extra)','Sesión iniciada','Menú','Vaciar caché','Eliminar miniaturas y GIF de la carpeta actual','Sincronizar caché','Sincronizar la caché con el contenido actual de las carpetas','Crear hash','Cerrar sesión','Iniciar sesión','Carpetas','Fotos','No se encontraron imágenes.','Visor de fotos','Cerrar visor (Esc)','Foto anterior (flecha izquierda)','Foto siguiente (flecha derecha)','Información y datos EXIF (i)','Cancelar','¿Eliminar TODAS las miniaturas y GIF de TODAS las carpetas?','¿Eliminar las miniaturas y el GIF de la carpeta actual?','¿Sincronizar la caché en TODAS las carpetas? Elimina archivos obsoletos y regenera miniaturas faltantes/antiguas.','¿Sincronizar la caché en la carpeta actual? Elimina archivos obsoletos y regenera miniaturas faltantes/antiguas.','Error al vaciar la caché','Error al sincronizar la caché','Error al generar el hash','Error','Caché vaciada.\nCarpetas: {dirs}\nMiniaturas: {thumbs}\nGIF: {gifs}','Sincronización completada.','{v} carpetas visitadas • miniaturas: {c} creadas, {r} actualizadas, {x} eliminadas • GIF: {g} actualizados, {y} eliminados','Sincronizando caché…','Analizando carpetas y miniaturas, espera.','Completado','Introduce la contraseña','Acceso denegado','Error de autenticación','Introduce la nueva contraseña para convertirla en hash (no se guardará automáticamente):','Hash generado y copiado al portapapeles:\n\n{hash}\n\nPégalo en «.config.json» en «auth_password».','no disponibles','Idioma','Automático (navegador)','Dimensiones','Cámara','Objetivo','Fecha','Distancia focal','Apertura','Exposición','presente'],
+    'pt' => ['Português','Acesso necessário','Palavra-passe','Entrar','Palavra-passe incorreta','Início','Sessão iniciada (funções extra ativadas)','Sem sessão (necessária para funções extra)','Sessão iniciada','Menu','Limpar cache','Eliminar miniaturas e GIF da pasta atual','Sincronizar cache','Sincronizar a cache com o conteúdo atual das pastas','Criar hash','Terminar sessão','Iniciar sessão','Pastas','Fotos','Nenhuma imagem encontrada.','Visualizador de fotos','Fechar visualizador (Esc)','Foto anterior (seta esquerda)','Foto seguinte (seta direita)','Informações e dados EXIF (i)','Cancelar','Eliminar TODAS as miniaturas e GIF de TODAS as pastas?','Eliminar as miniaturas e o GIF da pasta atual?','Sincronizar a cache em TODAS as pastas? Remove ficheiros obsoletos e regenera miniaturas em falta/antigas.','Sincronizar a cache na pasta atual? Remove ficheiros obsoletos e regenera miniaturas em falta/antigas.','Erro ao limpar a cache','Erro ao sincronizar a cache','Erro ao gerar o hash','Erro','Cache limpa.\nPastas: {dirs}\nMiniaturas: {thumbs}\nGIF: {gifs}','Sincronização concluída.','{v} pastas visitadas • miniaturas: {c} criadas, {r} atualizadas, {x} removidas • GIF: {g} atualizados, {y} removidos','A sincronizar cache…','A analisar pastas e miniaturas, aguarde.','Concluído','Introduza a palavra-passe','Acesso negado','Erro de autenticação','Introduza a nova palavra-passe a converter em hash (não será guardada automaticamente):','Hash gerado e copiado para a área de transferência:\n\n{hash}\n\nCole-o em «.config.json» em «auth_password».','não disponíveis','Idioma','Automático (navegador)','Dimensões','Câmara','Objetiva','Data','Distância focal','Abertura','Exposição','presente'],
+    'nl' => ['Nederlands','Toegang vereist','Wachtwoord','Inloggen','Onjuist wachtwoord','Home','Ingelogd (extra functies ingeschakeld)','Niet ingelogd (vereist voor extra functies)','Ingelogd','Menu','Cache wissen','Miniaturen en GIF’s van de huidige map verwijderen','Cache synchroniseren','Cache synchroniseren met de huidige inhoud van de mappen','Hash maken','Uitloggen','Inloggen','Mappen','Foto’s','Geen afbeeldingen gevonden.','Fotoviewer','Viewer sluiten (Esc)','Vorige foto (pijl links)','Volgende foto (pijl rechts)','Informatie en EXIF-gegevens (i)','Annuleren','ALLE miniaturen en GIF’s van ALLE mappen verwijderen?','Miniaturen en GIF van de huidige map verwijderen?','Cache synchroniseren voor ALLE mappen? Verwijdert verouderde bestanden en maakt ontbrekende/oude miniaturen opnieuw.','Cache synchroniseren voor de huidige map? Verwijdert verouderde bestanden en maakt ontbrekende/oude miniaturen opnieuw.','Fout bij het wissen van de cache','Fout bij het synchroniseren van de cache','Fout bij het maken van de hash','Fout','Cache gewist.\nMappen: {dirs}\nMiniaturen: {thumbs}\nGIF’s: {gifs}','Synchronisatie voltooid.','{v} mappen bezocht • miniaturen: {c} gemaakt, {r} bijgewerkt, {x} verwijderd • GIF’s: {g} bijgewerkt, {y} verwijderd','Cache synchroniseren…','Mappen en miniaturen worden geanalyseerd, even geduld.','Voltooid','Voer het wachtwoord in','Toegang geweigerd','Authenticatiefout','Voer het nieuwe wachtwoord in dat in een hash moet worden omgezet (wordt niet automatisch opgeslagen):','Hash gegenereerd en gekopieerd naar het klembord:\n\n{hash}\n\nPlak het in ".config.json" bij "auth_password".','niet beschikbaar','Taal','Automatisch (browser)','Afmetingen','Camera','Objectief','Datum','Brandpuntsafstand','Diafragma','Belichtingstijd','aanwezig'],
+    'pl' => ['Polski','Wymagany dostęp','Hasło','Wejdź','Nieprawidłowe hasło','Strona główna','Zalogowano (funkcje dodatkowe włączone)','Niezalogowano (wymagane dla funkcji dodatkowych)','Zalogowano','Menu','Wyczyść pamięć podręczną','Usuń miniatury i GIF-y bieżącego folderu','Synchronizuj pamięć podręczną','Synchronizuj pamięć podręczną z bieżącą zawartością folderów','Utwórz hash','Wyloguj','Zaloguj','Foldery','Zdjęcia','Nie znaleziono obrazów.','Przeglądarka zdjęć','Zamknij przeglądarkę (Esc)','Poprzednie zdjęcie (strzałka w lewo)','Następne zdjęcie (strzałka w prawo)','Informacje i dane EXIF (i)','Anuluj','Usunąć WSZYSTKIE miniatury i GIF-y ze WSZYSTKICH folderów?','Usunąć miniatury i GIF bieżącego folderu?','Zsynchronizować pamięć podręczną dla WSZYSTKICH folderów? Usuwa przestarzałe pliki i odtwarza brakujące/stare miniatury.','Zsynchronizować pamięć podręczną dla bieżącego folderu? Usuwa przestarzałe pliki i odtwarza brakujące/stare miniatury.','Błąd czyszczenia pamięci podręcznej','Błąd synchronizacji pamięci podręcznej','Błąd generowania hasha','Błąd','Wyczyszczono pamięć podręczną.\nFoldery: {dirs}\nMiniatury: {thumbs}\nGIF-y: {gifs}','Synchronizacja zakończona.','Odwiedzone foldery: {v} • miniatury: {c} utworzone, {r} zaktualizowane, {x} usunięte • GIF-y: {g} zaktualizowane, {y} usunięte','Synchronizacja pamięci podręcznej…','Analiza folderów i miniatur, proszę czekać.','Ukończono','Wpisz hasło','Odmowa dostępu','Błąd uwierzytelniania','Wpisz nowe hasło do zamiany na hash (nie zostanie zapisane automatycznie):','Hash wygenerowany i skopiowany do schowka:\n\n{hash}\n\nWklej go do „.config.json” w polu „auth_password”.','niedostępne','Język','Automatyczny (przeglądarka)','Wymiary','Aparat','Obiektyw','Data','Ogniskowa','Przysłona','Czas naświetlania','obecne'],
+    'ro' => ['Română','Acces necesar','Parolă','Intră','Parolă greșită','Acasă','Autentificat (funcții suplimentare activate)','Neautentificat (necesar pentru funcții suplimentare)','Autentificat','Meniu','Golește memoria cache','Șterge miniaturile și GIF-urile din dosarul curent','Sincronizează memoria cache','Sincronizează memoria cache cu conținutul actual al dosarelor','Creează hash','Deconectare','Autentificare','Dosare','Fotografii','Nu s-au găsit imagini.','Vizualizator foto','Închide vizualizatorul (Esc)','Fotografia anterioară (săgeata stânga)','Fotografia următoare (săgeata dreapta)','Informații și date EXIF (i)','Anulează','Ștergi TOATE miniaturile și GIF-urile din TOATE dosarele?','Ștergi miniaturile și GIF-ul din dosarul curent?','Sincronizezi memoria cache pentru TOATE dosarele? Elimină fișierele învechite și regenerează miniaturile lipsă/vechi.','Sincronizezi memoria cache pentru dosarul curent? Elimină fișierele învechite și regenerează miniaturile lipsă/vechi.','Eroare la golirea memoriei cache','Eroare la sincronizarea memoriei cache','Eroare la generarea hash-ului','Eroare','Memorie cache golită.\nDosare: {dirs}\nMiniaturi: {thumbs}\nGIF-uri: {gifs}','Sincronizare finalizată.','{v} dosare vizitate • miniaturi: {c} create, {r} actualizate, {x} eliminate • GIF-uri: {g} actualizate, {y} eliminate','Se sincronizează memoria cache…','Se analizează dosarele și miniaturile, așteaptă.','Finalizat','Introdu parola','Acces refuzat','Eroare de autentificare','Introdu parola nouă de transformat în hash (nu va fi salvată automat):','Hash generat și copiat în clipboard:\n\n{hash}\n\nLipește-l în „.config.json” la „auth_password”.','indisponibile','Limbă','Automat (browser)','Dimensiuni','Aparat foto','Obiectiv','Dată','Distanță focală','Apertură','Expunere','prezent'],
+    'cs' => ['Čeština','Vyžadován přístup','Heslo','Vstoupit','Nesprávné heslo','Domů','Přihlášen (extra funkce povoleny)','Nepřihlášen (vyžadováno pro extra funkce)','Přihlášen','Nabídka','Vymazat mezipaměť','Smazat náhledy a GIFy aktuální složky','Synchronizovat mezipaměť','Synchronizovat mezipaměť s aktuálním obsahem složek','Vytvořit hash','Odhlásit se','Přihlásit se','Složky','Fotky','Nenalezeny žádné obrázky.','Prohlížeč fotek','Zavřít prohlížeč (Esc)','Předchozí fotka (šipka vlevo)','Další fotka (šipka vpravo)','Informace a data EXIF (i)','Zrušit','Smazat VŠECHNY náhledy a GIFy ve VŠECH složkách?','Smazat náhledy a GIF aktuální složky?','Synchronizovat mezipaměť pro VŠECHNY složky? Odstraní zastaralé soubory a znovu vytvoří chybějící/staré náhledy.','Synchronizovat mezipaměť pro aktuální složku? Odstraní zastaralé soubory a znovu vytvoří chybějící/staré náhledy.','Chyba při mazání mezipaměti','Chyba při synchronizaci mezipaměti','Chyba při generování hashe','Chyba','Mezipaměť vymazána.\nSložky: {dirs}\nNáhledy: {thumbs}\nGIFy: {gifs}','Synchronizace dokončena.','Navštívené složky: {v} • náhledy: {c} vytvořeno, {r} aktualizováno, {x} odstraněno • GIFy: {g} aktualizováno, {y} odstraněno','Synchronizace mezipaměti…','Analyzuji složky a náhledy, čekejte prosím.','Dokončeno','Zadejte heslo','Přístup odepřen','Chyba ověření','Zadejte nové heslo, které se převede na hash (nebude automaticky uloženo):','Hash vytvořen a zkopírován do schránky:\n\n{hash}\n\nVložte jej do „.config.json“ do „auth_password“.','nedostupné','Jazyk','Automaticky (prohlížeč)','Rozměry','Fotoaparát','Objektiv','Datum','Ohnisková vzdálenost','Clona','Expoziční čas','přítomno'],
+    'sk' => ['Slovenčina','Vyžaduje sa prístup','Heslo','Vstúpiť','Nesprávne heslo','Domov','Prihlásený (extra funkcie povolené)','Neprihlásený (vyžaduje sa pre extra funkcie)','Prihlásený','Ponuka','Vymazať vyrovnávaciu pamäť','Odstrániť náhľady a GIFy aktuálneho priečinka','Synchronizovať vyrovnávaciu pamäť','Synchronizovať vyrovnávaciu pamäť s aktuálnym obsahom priečinkov','Vytvoriť hash','Odhlásiť sa','Prihlásiť sa','Priečinky','Fotky','Nenašli sa žiadne obrázky.','Prehliadač fotiek','Zavrieť prehliadač (Esc)','Predchádzajúca fotka (šípka vľavo)','Nasledujúca fotka (šípka vpravo)','Informácie a údaje EXIF (i)','Zrušiť','Odstrániť VŠETKY náhľady a GIFy zo VŠETKÝCH priečinkov?','Odstrániť náhľady a GIF aktuálneho priečinka?','Synchronizovať vyrovnávaciu pamäť pre VŠETKY priečinky? Odstráni zastarané súbory a znova vytvorí chýbajúce/staré náhľady.','Synchronizovať vyrovnávaciu pamäť pre aktuálny priečinok? Odstráni zastarané súbory a znova vytvorí chýbajúce/staré náhľady.','Chyba pri mazaní vyrovnávacej pamäte','Chyba pri synchronizácii vyrovnávacej pamäte','Chyba pri generovaní hashu','Chyba','Vyrovnávacia pamäť vymazaná.\nPriečinky: {dirs}\nNáhľady: {thumbs}\nGIFy: {gifs}','Synchronizácia dokončená.','Navštívené priečinky: {v} • náhľady: {c} vytvorených, {r} aktualizovaných, {x} odstránených • GIFy: {g} aktualizovaných, {y} odstránených','Synchronizácia vyrovnávacej pamäte…','Analyzujem priečinky a náhľady, čakajte.','Dokončené','Zadajte heslo','Prístup zamietnutý','Chyba overenia','Zadajte nové heslo na prevod na hash (neuloží sa automaticky):','Hash vytvorený a skopírovaný do schránky:\n\n{hash}\n\nVložte ho do „.config.json“ do „auth_password“.','nedostupné','Jazyk','Automaticky (prehliadač)','Rozmery','Fotoaparát','Objektív','Dátum','Ohnisková vzdialenosť','Clona','Expozičný čas','prítomné'],
+    'sl' => ['Slovenščina','Potreben dostop','Geslo','Vstopi','Napačno geslo','Domov','Prijavljen (dodatne funkcije omogočene)','Ni prijave (potrebno za dodatne funkcije)','Prijavljen','Meni','Počisti predpomnilnik','Izbriši predoglede in GIF-e trenutne mape','Sinhroniziraj predpomnilnik','Sinhroniziraj predpomnilnik s trenutno vsebino map','Ustvari hash','Odjava','Prijava','Mape','Fotografije','Ni najdenih slik.','Pregledovalnik fotografij','Zapri pregledovalnik (Esc)','Prejšnja fotografija (puščica levo)','Naslednja fotografija (puščica desno)','Informacije in podatki EXIF (i)','Prekliči','Izbrišem VSE predoglede in GIF-e v VSEH mapah?','Izbrišem predoglede in GIF trenutne mape?','Sinhroniziram predpomnilnik za VSE mape? Odstrani zastarele datoteke in znova ustvari manjkajoče/stare predoglede.','Sinhroniziram predpomnilnik za trenutno mapo? Odstrani zastarele datoteke in znova ustvari manjkajoče/stare predoglede.','Napaka pri čiščenju predpomnilnika','Napaka pri sinhronizaciji predpomnilnika','Napaka pri ustvarjanju hasha','Napaka','Predpomnilnik počiščen.\nMape: {dirs}\nPredogledi: {thumbs}\nGIF-i: {gifs}','Sinhronizacija končana.','Obiskanih map: {v} • predogledi: {c} ustvarjenih, {r} posodobljenih, {x} odstranjenih • GIF-i: {g} posodobljenih, {y} odstranjenih','Sinhronizacija predpomnilnika…','Analiziram mape in predoglede, počakajte.','Končano','Vnesite geslo','Dostop zavrnjen','Napaka pri overjanju','Vnesite novo geslo za pretvorbo v hash (ne bo samodejno shranjeno):','Hash ustvarjen in kopiran v odložišče:\n\n{hash}\n\nVstavite ga v „.config.json“ pri „auth_password“.','ni na voljo','Jezik','Samodejno (brskalnik)','Mere','Fotoaparat','Objektiv','Datum','Goriščna razdalja','Zaslonka','Ekspozicija','prisotno'],
+    'hr' => ['Hrvatski','Potreban pristup','Lozinka','Uđi','Pogrešna lozinka','Početna','Prijavljen (dodatne funkcije omogućene)','Nije prijavljen (potrebno za dodatne funkcije)','Prijavljen','Izbornik','Očisti predmemoriju','Izbriši sličice i GIF-ove trenutne mape','Sinkroniziraj predmemoriju','Sinkroniziraj predmemoriju s trenutnim sadržajem mapa','Izradi hash','Odjava','Prijava','Mape','Fotografije','Nema pronađenih slika.','Preglednik fotografija','Zatvori preglednik (Esc)','Prethodna fotografija (strelica lijevo)','Sljedeća fotografija (strelica desno)','Informacije i EXIF podaci (i)','Odustani','Izbrisati SVE sličice i GIF-ove iz SVIH mapa?','Izbrisati sličice i GIF trenutne mape?','Sinkronizirati predmemoriju za SVE mape? Uklanja zastarjele datoteke i ponovno izrađuje nedostajuće/stare sličice.','Sinkronizirati predmemoriju za trenutnu mapu? Uklanja zastarjele datoteke i ponovno izrađuje nedostajuće/stare sličice.','Pogreška pri čišćenju predmemorije','Pogreška pri sinkronizaciji predmemorije','Pogreška pri izradi hasha','Pogreška','Predmemorija očišćena.\nMape: {dirs}\nSličice: {thumbs}\nGIF-ovi: {gifs}','Sinkronizacija dovršena.','Posjećeno mapa: {v} • sličice: {c} izrađeno, {r} ažurirano, {x} uklonjeno • GIF-ovi: {g} ažurirano, {y} uklonjeno','Sinkronizacija predmemorije…','Analiza mapa i sličica, pričekajte.','Dovršeno','Unesite lozinku','Pristup odbijen','Pogreška autentifikacije','Unesite novu lozinku za pretvaranje u hash (neće se automatski spremiti):','Hash izrađen i kopiran u međuspremnik:\n\n{hash}\n\nZalijepite ga u „.config.json“ pod „auth_password“.','nije dostupno','Jezik','Automatski (preglednik)','Dimenzije','Fotoaparat','Objektiv','Datum','Žarišna duljina','Otvor blende','Ekspozicija','prisutno'],
+    'bg' => ['Български','Необходим е достъп','Парола','Вход','Грешна парола','Начало','Вписан (допълнителните функции са включени)','Не сте вписани (необходимо за допълнителни функции)','Вписан','Меню','Изчисти кеша','Изтрий миниатюрите и GIF файловете на текущата папка','Синхронизирай кеша','Синхронизирай кеша със съдържанието на папките','Създай хеш','Изход','Вход','Папки','Снимки','Няма намерени изображения.','Преглед на снимки','Затвори прегледа (Esc)','Предишна снимка (стрелка наляво)','Следваща снимка (стрелка надясно)','Информация и EXIF данни (i)','Отказ','Да се изтрият ВСИЧКИ миниатюри и GIF файлове от ВСИЧКИ папки?','Да се изтрият миниатюрите и GIF файла на текущата папка?','Да се синхронизира кешът за ВСИЧКИ папки? Премахва остарели файлове и създава наново липсващите/старите миниатюри.','Да се синхронизира кешът за текущата папка? Премахва остарели файлове и създава наново липсващите/старите миниатюри.','Грешка при изчистване на кеша','Грешка при синхронизиране на кеша','Грешка при създаване на хеш','Грешка','Кешът е изчистен.\nПапки: {dirs}\nМиниатюри: {thumbs}\nGIF: {gifs}','Синхронизирането завърши.','Посетени папки: {v} • миниатюри: {c} създадени, {r} обновени, {x} премахнати • GIF: {g} обновени, {y} премахнати','Синхронизиране на кеша…','Анализ на папки и миниатюри, моля изчакайте.','Готово','Въведете паролата','Достъпът е отказан','Грешка при удостоверяване','Въведете новата парола, която да се превърне в хеш (няма да се запази автоматично):','Хешът е създаден и копиран в клипборда:\n\n{hash}\n\nПоставете го в „.config.json“ в „auth_password“.','не е наличен','Език','Автоматично (браузър)','Размери','Фотоапарат','Обектив','Дата','Фокусно разстояние','Бленда','Експонация','налично'],
+    'el' => ['Ελληνικά','Απαιτείται πρόσβαση','Κωδικός πρόσβασης','Είσοδος','Λάθος κωδικός πρόσβασης','Αρχική','Συνδεδεμένος (ενεργές οι πρόσθετες λειτουργίες)','Μη συνδεδεμένος (απαιτείται για πρόσθετες λειτουργίες)','Συνδεδεμένος','Μενού','Εκκαθάριση προσωρινής μνήμης','Διαγραφή μικρογραφιών και GIF του τρέχοντος φακέλου','Συγχρονισμός προσωρινής μνήμης','Συγχρονισμός της προσωρινής μνήμης με το τρέχον περιεχόμενο των φακέλων','Δημιουργία hash','Αποσύνδεση','Σύνδεση','Φάκελοι','Φωτογραφίες','Δεν βρέθηκαν εικόνες.','Προβολέας φωτογραφιών','Κλείσιμο προβολέα (Esc)','Προηγούμενη φωτογραφία (αριστερό βέλος)','Επόμενη φωτογραφία (δεξί βέλος)','Πληροφορίες και δεδομένα EXIF (i)','Άκυρο','Διαγραφή ΟΛΩΝ των μικρογραφιών και GIF από ΟΛΟΥΣ τους φακέλους;','Διαγραφή των μικρογραφιών και του GIF του τρέχοντος φακέλου;','Συγχρονισμός της προσωρινής μνήμης για ΟΛΟΥΣ τους φακέλους; Αφαιρεί παρωχημένα αρχεία και ξαναδημιουργεί τις ελλείπουσες/παλιές μικρογραφίες.','Συγχρονισμός της προσωρινής μνήμης για τον τρέχοντα φάκελο; Αφαιρεί παρωχημένα αρχεία και ξαναδημιουργεί τις ελλείπουσες/παλιές μικρογραφίες.','Σφάλμα κατά την εκκαθάριση της προσωρινής μνήμης','Σφάλμα κατά τον συγχρονισμό της προσωρινής μνήμης','Σφάλμα κατά τη δημιουργία hash','Σφάλμα','Η προσωρινή μνήμη εκκαθαρίστηκε.\nΦάκελοι: {dirs}\nΜικρογραφίες: {thumbs}\nGIF: {gifs}','Ο συγχρονισμός ολοκληρώθηκε.','Επισκέψεις σε {v} φακέλους • μικρογραφίες: {c} δημιουργήθηκαν, {r} ενημερώθηκαν, {x} αφαιρέθηκαν • GIF: {g} ενημερώθηκαν, {y} αφαιρέθηκαν','Συγχρονισμός προσωρινής μνήμης…','Ανάλυση φακέλων και μικρογραφιών, παρακαλώ περιμένετε.','Ολοκληρώθηκε','Εισαγάγετε τον κωδικό πρόσβασης','Άρνηση πρόσβασης','Σφάλμα ταυτοποίησης','Εισαγάγετε τον νέο κωδικό για μετατροπή σε hash (δεν θα αποθηκευτεί αυτόματα):','Το hash δημιουργήθηκε και αντιγράφηκε στο πρόχειρο:\n\n{hash}\n\nΕπικολλήστε το στο «.config.json» στο «auth_password».','μη διαθέσιμα','Γλώσσα','Αυτόματα (πρόγραμμα περιήγησης)','Διαστάσεις','Κάμερα','Φακός','Ημερομηνία','Εστιακό μήκος','Διάφραγμα','Έκθεση','υπάρχει'],
+    'hu' => ['Magyar','Hozzáférés szükséges','Jelszó','Belépés','Hibás jelszó','Kezdőlap','Bejelentkezve (extra funkciók engedélyezve)','Nincs bejelentkezve (extra funkciókhoz szükséges)','Bejelentkezve','Menü','Gyorsítótár törlése','Az aktuális mappa bélyegképeinek és GIF-jeinek törlése','Gyorsítótár szinkronizálása','Gyorsítótár szinkronizálása a mappák aktuális tartalmával','Hash létrehozása','Kijelentkezés','Bejelentkezés','Mappák','Fotók','Nem található kép.','Fotómegjelenítő','Megjelenítő bezárása (Esc)','Előző fotó (bal nyíl)','Következő fotó (jobb nyíl)','Információk és EXIF-adatok (i)','Mégse','Törli AZ ÖSSZES bélyegképet és GIF-et AZ ÖSSZES mappából?','Törli az aktuális mappa bélyegképeit és GIF-jét?','Szinkronizálja a gyorsítótárat AZ ÖSSZES mappára? Eltávolítja az elavult fájlokat, és újragenerálja a hiányzó/régi bélyegképeket.','Szinkronizálja a gyorsítótárat az aktuális mappára? Eltávolítja az elavult fájlokat, és újragenerálja a hiányzó/régi bélyegképeket.','Hiba a gyorsítótár törlésekor','Hiba a gyorsítótár szinkronizálásakor','Hiba a hash létrehozásakor','Hiba','Gyorsítótár törölve.\nMappák: {dirs}\nBélyegképek: {thumbs}\nGIF-ek: {gifs}','A szinkronizálás befejeződött.','{v} mappa érintve • bélyegképek: {c} létrehozva, {r} frissítve, {x} eltávolítva • GIF-ek: {g} frissítve, {y} eltávolítva','Gyorsítótár szinkronizálása…','Mappák és bélyegképek elemzése, kérjük, várjon.','Kész','Adja meg a jelszót','Hozzáférés megtagadva','Hitelesítési hiba','Adja meg az új jelszót, amelyből hash készül (nem kerül automatikusan mentésre):','A hash létrejött és a vágólapra másolódott:\n\n{hash}\n\nMásolja be a „.config.json” fájl „auth_password” mezőjébe.','nem érhető el','Nyelv','Automatikus (böngésző)','Méretek','Fényképezőgép','Objektív','Dátum','Gyújtótávolság','Rekesz','Expozíció','jelen van'],
+    'fi' => ['Suomi','Pääsy vaaditaan','Salasana','Kirjaudu','Väärä salasana','Etusivu','Kirjautunut (lisätoiminnot käytössä)','Ei kirjautunut (vaaditaan lisätoimintoihin)','Kirjautunut','Valikko','Tyhjennä välimuisti','Poista nykyisen kansion pikkukuvat ja GIFit','Synkronoi välimuisti','Synkronoi välimuisti kansioiden nykyiseen sisältöön','Luo tiiviste','Kirjaudu ulos','Kirjaudu sisään','Kansiot','Kuvat','Kuvia ei löytynyt.','Kuvankatselin','Sulje katselin (Esc)','Edellinen kuva (vasen nuoli)','Seuraava kuva (oikea nuoli)','Tiedot ja EXIF-tiedot (i)','Peruuta','Poistetaanko KAIKKI pikkukuvat ja GIFit KAIKISTA kansioista?','Poistetaanko nykyisen kansion pikkukuvat ja GIF?','Synkronoidaanko välimuisti KAIKILLE kansioille? Poistaa vanhentuneet tiedostot ja luo puuttuvat/vanhat pikkukuvat uudelleen.','Synkronoidaanko välimuisti nykyiselle kansiolle? Poistaa vanhentuneet tiedostot ja luo puuttuvat/vanhat pikkukuvat uudelleen.','Virhe välimuistin tyhjennyksessä','Virhe välimuistin synkronoinnissa','Virhe tiivisteen luonnissa','Virhe','Välimuisti tyhjennetty.\nKansiot: {dirs}\nPikkukuvat: {thumbs}\nGIFit: {gifs}','Synkronointi valmis.','Käytyjä kansioita: {v} • pikkukuvat: {c} luotu, {r} päivitetty, {x} poistettu • GIFit: {g} päivitetty, {y} poistettu','Synkronoidaan välimuistia…','Analysoidaan kansioita ja pikkukuvia, odota.','Valmis','Anna salasana','Pääsy estetty','Tunnistautumisvirhe','Anna uusi salasana, josta tehdään tiiviste (sitä ei tallenneta automaattisesti):','Tiiviste luotu ja kopioitu leikepöydälle:\n\n{hash}\n\nLiitä se tiedostoon ".config.json" kohtaan "auth_password".','ei saatavilla','Kieli','Automaattinen (selain)','Mitat','Kamera','Objektiivi','Päivämäärä','Polttoväli','Aukko','Valotusaika','läsnä'],
+    'sv' => ['Svenska','Åtkomst krävs','Lösenord','Logga in','Fel lösenord','Hem','Inloggad (extrafunktioner aktiverade)','Inte inloggad (krävs för extrafunktioner)','Inloggad','Meny','Rensa cache','Ta bort miniatyrer och GIF:ar i aktuell mapp','Synkronisera cache','Synkronisera cachen med mapparnas aktuella innehåll','Skapa hash','Logga ut','Logga in','Mappar','Foton','Inga bilder hittades.','Fotovisare','Stäng visaren (Esc)','Föregående foto (vänsterpil)','Nästa foto (högerpil)','Information och EXIF-data (i)','Avbryt','Ta bort ALLA miniatyrer och GIF:ar i ALLA mappar?','Ta bort miniatyrer och GIF i aktuell mapp?','Synkronisera cachen för ALLA mappar? Tar bort föråldrade filer och återskapar saknade/gamla miniatyrer.','Synkronisera cachen för aktuell mapp? Tar bort föråldrade filer och återskapar saknade/gamla miniatyrer.','Fel vid rensning av cache','Fel vid synkronisering av cache','Fel vid skapande av hash','Fel','Cachen rensad.\nMappar: {dirs}\nMiniatyrer: {thumbs}\nGIF:ar: {gifs}','Synkroniseringen är klar.','{v} mappar besökta • miniatyrer: {c} skapade, {r} uppdaterade, {x} borttagna • GIF:ar: {g} uppdaterade, {y} borttagna','Synkroniserar cache…','Analyserar mappar och miniatyrer, vänta.','Klart','Ange lösenordet','Åtkomst nekad','Autentiseringsfel','Ange det nya lösenordet som ska omvandlas till en hash (sparas inte automatiskt):','Hash skapad och kopierad till urklipp:\n\n{hash}\n\nKlistra in den i ".config.json" under "auth_password".','inte tillgängliga','Språk','Automatiskt (webbläsare)','Mått','Kamera','Objektiv','Datum','Brännvidd','Bländare','Exponering','finns'],
+    'da' => ['Dansk','Adgang påkrævet','Adgangskode','Gå ind','Forkert adgangskode','Hjem','Logget ind (ekstra funktioner aktiveret)','Ikke logget ind (kræves til ekstra funktioner)','Logget ind','Menu','Ryd cache','Slet miniaturer og GIF’er i den aktuelle mappe','Synkroniser cache','Synkroniser cachen med mappernes aktuelle indhold','Opret hash','Log ud','Log ind','Mapper','Fotos','Ingen billeder fundet.','Fotovisning','Luk visning (Esc)','Forrige foto (venstrepil)','Næste foto (højrepil)','Oplysninger og EXIF-data (i)','Annuller','Slet ALLE miniaturer og GIF’er i ALLE mapper?','Slet miniaturer og GIF i den aktuelle mappe?','Synkroniser cachen for ALLE mapper? Fjerner forældede filer og genskaber manglende/gamle miniaturer.','Synkroniser cachen for den aktuelle mappe? Fjerner forældede filer og genskaber manglende/gamle miniaturer.','Fejl ved rydning af cache','Fejl ved synkronisering af cache','Fejl ved oprettelse af hash','Fejl','Cache ryddet.\nMapper: {dirs}\nMiniaturer: {thumbs}\nGIF’er: {gifs}','Synkronisering fuldført.','{v} mapper besøgt • miniaturer: {c} oprettet, {r} opdateret, {x} fjernet • GIF’er: {g} opdateret, {y} fjernet','Synkroniserer cache…','Analyserer mapper og miniaturer, vent venligst.','Fuldført','Indtast adgangskoden','Adgang nægtet','Godkendelsesfejl','Indtast den nye adgangskode, der skal omdannes til en hash (gemmes ikke automatisk):','Hash oprettet og kopieret til udklipsholderen:\n\n{hash}\n\nIndsæt den i ".config.json" under "auth_password".','ikke tilgængelige','Sprog','Automatisk (browser)','Dimensioner','Kamera','Objektiv','Dato','Brændvidde','Blænde','Eksponering','til stede'],
+    'no' => ['Norsk','Tilgang kreves','Passord','Gå inn','Feil passord','Hjem','Logget inn (ekstrafunksjoner aktivert)','Ikke logget inn (kreves for ekstrafunksjoner)','Logget inn','Meny','Tøm hurtigbuffer','Slett miniatyrbilder og GIF-er i gjeldende mappe','Synkroniser hurtigbuffer','Synkroniser hurtigbufferen med mappenes gjeldende innhold','Opprett hash','Logg ut','Logg inn','Mapper','Bilder','Ingen bilder funnet.','Bildeviser','Lukk visning (Esc)','Forrige bilde (venstrepil)','Neste bilde (høyrepil)','Informasjon og EXIF-data (i)','Avbryt','Slette ALLE miniatyrbilder og GIF-er i ALLE mapper?','Slette miniatyrbilder og GIF i gjeldende mappe?','Synkronisere hurtigbufferen for ALLE mapper? Fjerner utdaterte filer og lager manglende/gamle miniatyrbilder på nytt.','Synkronisere hurtigbufferen for gjeldende mappe? Fjerner utdaterte filer og lager manglende/gamle miniatyrbilder på nytt.','Feil ved tømming av hurtigbuffer','Feil ved synkronisering av hurtigbuffer','Feil ved oppretting av hash','Feil','Hurtigbuffer tømt.\nMapper: {dirs}\nMiniatyrbilder: {thumbs}\nGIF-er: {gifs}','Synkroniseringen er fullført.','{v} mapper besøkt • miniatyrbilder: {c} opprettet, {r} oppdatert, {x} fjernet • GIF-er: {g} oppdatert, {y} fjernet','Synkroniserer hurtigbuffer…','Analyserer mapper og miniatyrbilder, vent.','Fullført','Skriv inn passordet','Tilgang nektet','Autentiseringsfeil','Skriv inn det nye passordet som skal gjøres om til en hash (lagres ikke automatisk):','Hash opprettet og kopiert til utklippstavlen:\n\n{hash}\n\nLim den inn i ".config.json" under "auth_password".','ikke tilgjengelig','Språk','Automatisk (nettleser)','Dimensjoner','Kamera','Objektiv','Dato','Brennvidde','Blenderåpning','Eksponering','til stede'],
+    'is' => ['Íslenska','Aðgangs krafist','Lykilorð','Inn','Rangt lykilorð','Heim','Skráður inn (aukaeiginleikar virkir)','Ekki skráður inn (nauðsynlegt fyrir aukaeiginleika)','Skráður inn','Valmynd','Hreinsa skyndiminni','Eyða smámyndum og GIF-um í núverandi möppu','Samstilla skyndiminni','Samstilla skyndiminni við núverandi innihald mappa','Búa til hass','Skrá út','Skrá inn','Möppur','Myndir','Engar myndir fundust.','Myndskoðari','Loka skoðara (Esc)','Fyrri mynd (vinstri ör)','Næsta mynd (hægri ör)','Upplýsingar og EXIF-gögn (i)','Hætta við','Eyða ÖLLUM smámyndum og GIF-um í ÖLLUM möppum?','Eyða smámyndum og GIF í núverandi möppu?','Samstilla skyndiminni fyrir ALLAR möppur? Fjarlægir úrelt skjöl og býr til vantandi/gamlar smámyndir aftur.','Samstilla skyndiminni fyrir núverandi möppu? Fjarlægir úrelt skjöl og býr til vantandi/gamlar smámyndir aftur.','Villa við hreinsun skyndiminnis','Villa við samstillingu skyndiminnis','Villa við gerð hass','Villa','Skyndiminni hreinsað.\nMöppur: {dirs}\nSmámyndir: {thumbs}\nGIF: {gifs}','Samstillingu lokið.','{v} möppur heimsóttar • smámyndir: {c} búnar til, {r} uppfærðar, {x} fjarlægðar • GIF: {g} uppfærð, {y} fjarlægð','Samstilli skyndiminni…','Greini möppur og smámyndir, vinsamlegast bíðið.','Lokið','Sláðu inn lykilorðið','Aðgangi hafnað','Auðkenningarvilla','Sláðu inn nýja lykilorðið sem á að breyta í hass (það er ekki vistað sjálfkrafa):','Hass búið til og afritað á klippiborð:\n\n{hash}\n\nLímdu það inn í ".config.json" undir "auth_password".','ekki tiltækt','Tungumál','Sjálfvirkt (vafri)','Stærð','Myndavél','Linsa','Dagsetning','Brennivídd','Ljósop','Lýsing','til staðar'],
+    'et' => ['Eesti','Vajalik on juurdepääs','Parool','Sisene','Vale parool','Avaleht','Sisse logitud (lisafunktsioonid lubatud)','Pole sisse logitud (vajalik lisafunktsioonide jaoks)','Sisse logitud','Menüü','Tühjenda vahemälu','Kustuta praeguse kausta pisipildid ja GIF-id','Sünkrooni vahemälu','Sünkrooni vahemälu kaustade praeguse sisuga','Loo räsi','Logi välja','Logi sisse','Kaustad','Fotod','Pilte ei leitud.','Fotovaatur','Sulge vaatur (Esc)','Eelmine foto (vasaknool)','Järgmine foto (paremnool)','Teave ja EXIF-andmed (i)','Tühista','Kas kustutada KÕIGI kaustade KÕIK pisipildid ja GIF-id?','Kas kustutada praeguse kausta pisipildid ja GIF?','Kas sünkroonida vahemälu KÕIGI kaustade jaoks? Eemaldab aegunud failid ja loob puuduvad/vanad pisipildid uuesti.','Kas sünkroonida vahemälu praeguse kausta jaoks? Eemaldab aegunud failid ja loob puuduvad/vanad pisipildid uuesti.','Viga vahemälu tühjendamisel','Viga vahemälu sünkroonimisel','Viga räsi loomisel','Viga','Vahemälu tühjendatud.\nKaustad: {dirs}\nPisipildid: {thumbs}\nGIF-id: {gifs}','Sünkroonimine lõpetatud.','Külastatud kaustu: {v} • pisipildid: {c} loodud, {r} uuendatud, {x} eemaldatud • GIF-id: {g} uuendatud, {y} eemaldatud','Vahemälu sünkroonimine…','Analüüsin kaustu ja pisipilte, palun oota.','Valmis','Sisesta parool','Juurdepääs keelatud','Autentimisviga','Sisesta uus parool, millest tehakse räsi (seda ei salvestata automaatselt):','Räsi loodud ja kopeeritud lõikelauale:\n\n{hash}\n\nKleebi see faili ".config.json" välja "auth_password".','pole saadaval','Keel','Automaatne (brauser)','Mõõtmed','Kaamera','Objektiiv','Kuupäev','Fookuskaugus','Ava','Säriaeg','olemas'],
+    'lv' => ['Latviešu','Nepieciešama piekļuve','Parole','Ieiet','Nepareiza parole','Sākums','Pieteicies (papildfunkcijas iespējotas)','Nav pieteicies (nepieciešams papildfunkcijām)','Pieteicies','Izvēlne','Notīrīt kešatmiņu','Dzēst pašreizējās mapes sīktēlus un GIF failus','Sinhronizēt kešatmiņu','Sinhronizēt kešatmiņu ar mapju pašreizējo saturu','Izveidot jaucējkodu','Iziet','Pieteikties','Mapes','Fotoattēli','Attēli nav atrasti.','Fotoattēlu skatītājs','Aizvērt skatītāju (Esc)','Iepriekšējais fotoattēls (kreisā bulta)','Nākamais fotoattēls (labā bulta)','Informācija un EXIF dati (i)','Atcelt','Dzēst VISUS sīktēlus un GIF failus VISĀS mapēs?','Dzēst pašreizējās mapes sīktēlus un GIF failu?','Sinhronizēt kešatmiņu VISĀM mapēm? Noņem novecojušus failus un no jauna izveido trūkstošos/vecos sīktēlus.','Sinhronizēt kešatmiņu pašreizējai mapei? Noņem novecojušus failus un no jauna izveido trūkstošos/vecos sīktēlus.','Kļūda, tīrot kešatmiņu','Kļūda, sinhronizējot kešatmiņu','Kļūda, veidojot jaucējkodu','Kļūda','Kešatmiņa notīrīta.\nMapes: {dirs}\nSīktēli: {thumbs}\nGIF: {gifs}','Sinhronizācija pabeigta.','Apmeklētas mapes: {v} • sīktēli: {c} izveidoti, {r} atjaunināti, {x} noņemti • GIF: {g} atjaunināti, {y} noņemti','Sinhronizē kešatmiņu…','Analizē mapes un sīktēlus, lūdzu, uzgaidiet.','Pabeigts','Ievadiet paroli','Piekļuve liegta','Autentifikācijas kļūda','Ievadiet jauno paroli, ko pārvērst jaucējkodā (tā netiks automātiski saglabāta):','Jaucējkods izveidots un nokopēts starpliktuvē:\n\n{hash}\n\nIelīmējiet to failā ".config.json" laukā "auth_password".','nav pieejami','Valoda','Automātiski (pārlūks)','Izmēri','Kamera','Objektīvs','Datums','Fokusa attālums','Diafragma','Ekspozīcija','ir'],
+    'lt' => ['Lietuvių','Reikalinga prieiga','Slaptažodis','Įeiti','Neteisingas slaptažodis','Pradžia','Prisijungta (papildomos funkcijos įjungtos)','Neprisijungta (reikalinga papildomoms funkcijoms)','Prisijungta','Meniu','Išvalyti talpyklą','Ištrinti dabartinio aplanko miniatiūras ir GIF','Sinchronizuoti talpyklą','Sinchronizuoti talpyklą su dabartiniu aplankų turiniu','Sukurti maišą','Atsijungti','Prisijungti','Aplankai','Nuotraukos','Vaizdų nerasta.','Nuotraukų peržiūra','Uždaryti peržiūrą (Esc)','Ankstesnė nuotrauka (kairė rodyklė)','Kita nuotrauka (dešinė rodyklė)','Informacija ir EXIF duomenys (i)','Atšaukti','Ištrinti VISAS miniatiūras ir GIF iš VISŲ aplankų?','Ištrinti dabartinio aplanko miniatiūras ir GIF?','Sinchronizuoti talpyklą VISIEMS aplankams? Pašalina pasenusius failus ir iš naujo sukuria trūkstamas/senas miniatiūras.','Sinchronizuoti talpyklą dabartiniam aplankui? Pašalina pasenusius failus ir iš naujo sukuria trūkstamas/senas miniatiūras.','Klaida valant talpyklą','Klaida sinchronizuojant talpyklą','Klaida kuriant maišą','Klaida','Talpykla išvalyta.\nAplankai: {dirs}\nMiniatiūros: {thumbs}\nGIF: {gifs}','Sinchronizavimas baigtas.','Aplankyta aplankų: {v} • miniatiūros: {c} sukurta, {r} atnaujinta, {x} pašalinta • GIF: {g} atnaujinta, {y} pašalinta','Sinchronizuojama talpykla…','Analizuojami aplankai ir miniatiūros, palaukite.','Baigta','Įveskite slaptažodį','Prieiga uždrausta','Autentifikavimo klaida','Įveskite naują slaptažodį, kuris bus paverstas maišos reikšme (automatiškai neišsaugoma):','Maiša sukurta ir nukopijuota į iškarpinę:\n\n{hash}\n\nĮklijuokite ją į „.config.json“ laukelyje „auth_password“.','nepasiekiama','Kalba','Automatinė (naršyklė)','Matmenys','Fotoaparatas','Objektyvas','Data','Židinio nuotolis','Diafragma','Išlaikymas','yra'],
+    'ga' => ['Gaeilge','Teastaíonn rochtain','Pasfhocal','Isteach','Pasfhocal mícheart','Baile','Logáilte isteach (gnéithe breise cumasaithe)','Gan logáil isteach (riachtanach do ghnéithe breise)','Logáilte isteach','Roghchlár','Glan an taisce','Scrios mionsamhlacha agus GIFanna an fhillteáin reatha','Sioncronaigh an taisce','Sioncronaigh an taisce le hábhar reatha na bhfillteán','Cruthaigh hais','Logáil amach','Logáil isteach','Fillteáin','Grianghraif','Níor aimsíodh íomhánna.','Amharcán grianghraf','Dún an t-amharcán (Esc)','An grianghraf roimhe (saighead chlé)','An chéad ghrianghraf eile (saighead dheas)','Eolas agus sonraí EXIF (i)','Cealaigh','Scrios GACH mionsamhail agus GIF i GACH fillteán?','Scrios mionsamhlacha agus GIF an fhillteáin reatha?','Sioncronaigh an taisce do GACH fillteán? Baintear comhaid atá as dáta agus athghinntear mionsamhlacha atá ar iarraidh/sean.','Sioncronaigh an taisce don fhillteán reatha? Baintear comhaid atá as dáta agus athghinntear mionsamhlacha atá ar iarraidh/sean.','Earráid agus an taisce á glanadh','Earráid agus an taisce á sioncronú','Earráid agus hais á cruthú','Earráid','Taisce glanta.\nFillteáin: {dirs}\nMionsamhlacha: {thumbs}\nGIFanna: {gifs}','Sioncronú críochnaithe.','{v} fillteán cuairtithe • mionsamhlacha: {c} cruthaithe, {r} nuashonraithe, {x} bainte • GIFanna: {g} nuashonraithe, {y} bainte','Taisce á sioncronú…','Fillteáin agus mionsamhlacha á n-anailísiú, fan go fóill.','Críochnaithe','Cuir isteach an pasfhocal','Rochtain diúltaithe','Earráid fíordheimhnithe','Cuir isteach an pasfhocal nua le tiontú ina hais (ní shábhálfar go huathoibríoch é):','Hais cruthaithe agus cóipeáilte chuig an ghearrthaisce:\n\n{hash}\n\nPáisteáil é in ".config.json" faoi "auth_password".','níl ar fáil','Teanga','Uathoibríoch (brabhsálaí)','Toisí','Ceamara','Lionsa','Dáta','Fad fócasach','Cró','Nochtadh','i láthair'],
+    'mt' => ['Malti','Meħtieġ aċċess','Password','Idħol','Password ħażina','Home','Illoggjat (funzjonijiet żejda attivati)','Mhux illoggjat (meħtieġ għal funzjonijiet żejda)','Illoggjat','Menu','Naddaf il-cache','Ħassar thumbnails u GIFs tal-folder kurrenti','Sinkronizza l-cache','Sinkronizza l-cache mal-kontenut kurrenti tal-folders','Oħloq hash','Oħroġ','Idħol','Folders','Ritratti','Ma nstabu l-ebda immaġini.','Viewer tar-ritratti','Agħlaq il-viewer (Esc)','Ritratt preċedenti (vleġġa lemin)','Ritratt li jmiss (vleġġa xellug)','Informazzjoni u dejta EXIF (i)','Ikkanċella','Ħassar it-thumbnails u l-GIFs KOLLHA tal-folders KOLLHA?','Ħassar it-thumbnails u l-GIF tal-folder kurrenti?','Sinkronizza l-cache għall-folders KOLLHA? Ineħħi fajls skaduti u terġa’ toħloq thumbnails neqsin/qodma.','Sinkronizza l-cache għall-folder kurrenti? Ineħħi fajls skaduti u terġa’ toħloq thumbnails neqsin/qodma.','Żball fit-tindif tal-cache','Żball fis-sinkronizzazzjoni tal-cache','Żball fil-ħolqien tal-hash','Żball','Cache indifa.\nFolders: {dirs}\nThumbnails: {thumbs}\nGIFs: {gifs}','Sinkronizzazzjoni lesta.','{v} folders żurati • thumbnails: {c} maħluqa, {r} aġġornati, {x} imneħħija • GIFs: {g} aġġornati, {y} imneħħija','Qed tiġi sinkronizzata l-cache…','Qed jiġu analizzati l-folders u t-thumbnails, stenna.','Lest','Daħħal il-password','Aċċess miċħud','Żball ta’ awtentikazzjoni','Daħħal il-password il-ġdida biex tinbidel f’hash (ma tinħażinx awtomatikament):','Hash maħluq u kopjat fil-clipboard:\n\n{hash}\n\nIwweġġgu f’".config.json" taħt "auth_password".','mhux disponibbli','Lingwa','Awtomatiku (browser)','Dimensjonijiet','Kamera','Lenti','Data','Tul fokali','Apertura','Espożizzjoni','preżenti'],
+    'ca' => ['Català','Accés necessari','Contrasenya','Entra','Contrasenya incorrecta','Inici','Sessió iniciada (funcions extra activades)','Sense sessió (necessària per a funcions extra)','Sessió iniciada','Menú','Buida la memòria cau','Elimina les miniatures i els GIF de la carpeta actual','Sincronitza la memòria cau','Sincronitza la memòria cau amb el contingut actual de les carpetes','Crea un hash','Tanca la sessió','Inicia la sessió','Carpetes','Fotos','No s’ha trobat cap imatge.','Visor de fotos','Tanca el visor (Esc)','Foto anterior (fletxa esquerra)','Foto següent (fletxa dreta)','Informació i dades EXIF (i)','Cancel·la','Voleu eliminar TOTES les miniatures i els GIF de TOTES les carpetes?','Voleu eliminar les miniatures i el GIF de la carpeta actual?','Voleu sincronitzar la memòria cau a TOTES les carpetes? Elimina fitxers obsolets i regenera les miniatures que falten/antigues.','Voleu sincronitzar la memòria cau a la carpeta actual? Elimina fitxers obsolets i regenera les miniatures que falten/antigues.','Error en buidar la memòria cau','Error en sincronitzar la memòria cau','Error en generar el hash','Error','Memòria cau buidada.\nCarpetes: {dirs}\nMiniatures: {thumbs}\nGIF: {gifs}','Sincronització completada.','{v} carpetes visitades • miniatures: {c} creades, {r} actualitzades, {x} eliminades • GIF: {g} actualitzats, {y} eliminats','Sincronitzant la memòria cau…','Analitzant carpetes i miniatures, espereu.','Completat','Introduïu la contrasenya','Accés denegat','Error d’autenticació','Introduïu la nova contrasenya per convertir-la en hash (no es desarà automàticament):','Hash generat i copiat al porta-retalls:\n\n{hash}\n\nEnganxeu-lo a «.config.json» a «auth_password».','no disponibles','Idioma','Automàtic (navegador)','Dimensions','Càmera','Objectiu','Data','Distància focal','Obertura','Exposició','present'],
+    'uk' => ['Українська','Потрібен доступ','Пароль','Увійти','Невірний пароль','Головна','Виконано вхід (додаткові функції увімкнено)','Вхід не виконано (потрібен для додаткових функцій)','Виконано вхід','Меню','Очистити кеш','Видалити мініатюри та GIF поточної папки','Синхронізувати кеш','Синхронізувати кеш із поточним вмістом папок','Створити хеш','Вийти','Увійти','Папки','Фото','Зображень не знайдено.','Переглядач фото','Закрити переглядач (Esc)','Попереднє фото (стрілка вліво)','Наступне фото (стрілка вправо)','Інформація та дані EXIF (i)','Скасувати','Видалити УСІ мініатюри та GIF з УСІХ папок?','Видалити мініатюри та GIF поточної папки?','Синхронізувати кеш для УСІХ папок? Видаляє застарілі файли та заново створює відсутні/старі мініатюри.','Синхронізувати кеш для поточної папки? Видаляє застарілі файли та заново створює відсутні/старі мініатюри.','Помилка очищення кешу','Помилка синхронізації кешу','Помилка створення хеша','Помилка','Кеш очищено.\nПапки: {dirs}\nМініатюри: {thumbs}\nGIF: {gifs}','Синхронізацію завершено.','Відвідано папок: {v} • мініатюри: {c} створено, {r} оновлено, {x} видалено • GIF: {g} оновлено, {y} видалено','Синхронізація кешу…','Аналіз папок і мініатюр, зачекайте.','Завершено','Введіть пароль','Доступ заборонено','Помилка автентифікації','Введіть новий пароль для перетворення на хеш (автоматично не зберігатиметься):','Хеш створено й скопійовано в буфер обміну:\n\n{hash}\n\nВставте його в «.config.json» у «auth_password».','недоступно','Мова','Автоматично (браузер)','Розміри','Камера','Об’єктив','Дата','Фокусна відстань','Діафрагма','Витримка','є'],
+    'ru' => ['Русский','Требуется доступ','Пароль','Войти','Неверный пароль','Главная','Вход выполнен (дополнительные функции включены)','Вход не выполнен (требуется для дополнительных функций)','Вход выполнен','Меню','Очистить кэш','Удалить миниатюры и GIF текущей папки','Синхронизировать кэш','Синхронизировать кэш с текущим содержимым папок','Создать хеш','Выйти','Войти','Папки','Фото','Изображения не найдены.','Просмотр фото','Закрыть просмотр (Esc)','Предыдущее фото (стрелка влево)','Следующее фото (стрелка вправо)','Информация и данные EXIF (i)','Отмена','Удалить ВСЕ миниатюры и GIF из ВСЕХ папок?','Удалить миниатюры и GIF текущей папки?','Синхронизировать кэш для ВСЕХ папок? Удаляет устаревшие файлы и заново создаёт отсутствующие/старые миниатюры.','Синхронизировать кэш для текущей папки? Удаляет устаревшие файлы и заново создаёт отсутствующие/старые миниатюры.','Ошибка очистки кэша','Ошибка синхронизации кэша','Ошибка создания хеша','Ошибка','Кэш очищен.\nПапки: {dirs}\nМиниатюры: {thumbs}\nGIF: {gifs}','Синхронизация завершена.','Просмотрено папок: {v} • миниатюры: {c} создано, {r} обновлено, {x} удалено • GIF: {g} обновлено, {y} удалено','Синхронизация кэша…','Анализ папок и миниатюр, подождите.','Завершено','Введите пароль','Доступ запрещён','Ошибка аутентификации','Введите новый пароль для преобразования в хеш (автоматически не сохраняется):','Хеш создан и скопирован в буфер обмена:\n\n{hash}\n\nВставьте его в «.config.json» в «auth_password».','недоступны','Язык','Автоматически (браузер)','Размеры','Камера','Объектив','Дата','Фокусное расстояние','Диафрагма','Выдержка','есть'],
+    'sr' => ['Српски','Потребан је приступ','Лозинка','Уђи','Погрешна лозинка','Почетна','Пријављен (додатне функције омогућене)','Није пријављен (потребно за додатне функције)','Пријављен','Мени','Очисти кеш','Обриши сличице и GIF-ове тренутног фолдера','Синхронизуј кеш','Синхронизуј кеш са тренутним садржајем фолдера','Направи хеш','Одјави се','Пријави се','Фолдери','Фотографије','Нису пронађене слике.','Прегледач фотографија','Затвори прегледач (Esc)','Претходна фотографија (стрелица лево)','Следећа фотографија (стрелица десно)','Информације и EXIF подаци (i)','Откажи','Обрисати СВЕ сличице и GIF-ове из СВИХ фолдера?','Обрисати сличице и GIF тренутног фолдера?','Синхронизовати кеш за СВЕ фолдере? Уклања застареле фајлове и поново прави недостајуће/старе сличице.','Синхронизовати кеш за тренутни фолдер? Уклања застареле фајлове и поново прави недостајуће/старе сличице.','Грешка при чишћењу кеша','Грешка при синхронизацији кеша','Грешка при прављењу хеша','Грешка','Кеш је очишћен.\nФолдери: {dirs}\nСличице: {thumbs}\nGIF: {gifs}','Синхронизација је завршена.','Посећено фолдера: {v} • сличице: {c} направљено, {r} ажурирано, {x} уклоњено • GIF: {g} ажурирано, {y} уклоњено','Синхронизација кеша…','Анализа фолдера и сличица, сачекајте.','Завршено','Унесите лозинку','Приступ одбијен','Грешка при аутентификацији','Унесите нову лозинку за претварање у хеш (неће бити аутоматски сачувана):','Хеш је направљен и копиран у клипборд:\n\n{hash}\n\nЛепите га у „.config.json“ у „auth_password“.','није доступно','Језик','Аутоматски (прегледач)','Димензије','Камера','Објектив','Датум','Жижна даљина','Бленда','Експозиција','присутно'],
+    'sq' => ['Shqip','Kërkohet qasje','Fjalëkalimi','Hyr','Fjalëkalim i gabuar','Kreu','I identifikuar (funksionet shtesë të aktivizuara)','I paidentifikuar (kërkohet për funksionet shtesë)','I identifikuar','Menyja','Pastro cache','Fshi miniaturat dhe GIF-et e dosjes aktuale','Sinkronizo cache','Sinkronizo cache me përmbajtjen aktuale të dosjeve','Krijo hash','Dil','Hyr','Dosjet','Fotot','Nuk u gjet asnjë imazh.','Shikuesi i fotove','Mbyll shikuesin (Esc)','Foto e mëparshme (shigjeta majtas)','Foto tjetër (shigjeta djathtas)','Informacione dhe të dhëna EXIF (i)','Anulo','Të fshihen TË GJITHA miniaturat dhe GIF-et në TË GJITHA dosjet?','Të fshihen miniaturat dhe GIF-i i dosjes aktuale?','Të sinkronizohet cache për TË GJITHA dosjet? Heq skedarët e vjetëruar dhe rigjeneron miniaturat që mungojnë/të vjetra.','Të sinkronizohet cache për dosjen aktuale? Heq skedarët e vjetëruar dhe rigjeneron miniaturat që mungojnë/të vjetra.','Gabim gjatë pastrimit të cache','Gabim gjatë sinkronizimit të cache','Gabim gjatë krijimit të hash','Gabim','Cache u pastrua.\nDosje: {dirs}\nMiniatura: {thumbs}\nGIF: {gifs}','Sinkronizimi përfundoi.','{v} dosje të vizituara • miniatura: {c} të krijuara, {r} të përditësuara, {x} të hequra • GIF: {g} të përditësuara, {y} të hequra','Po sinkronizohet cache…','Po analizohen dosjet dhe miniaturat, prisni.','Përfundoi','Shkruani fjalëkalimin','Qasja u refuzua','Gabim autentikimi','Shkruani fjalëkalimin e ri që do të kthehet në hash (nuk ruhet automatikisht):','Hash u krijua dhe u kopjua në clipboard:\n\n{hash}\n\nNgjitni te ".config.json" te "auth_password".','nuk disponohen','Gjuha','Automatik (shfletuesi)','Përmasat','Kamera','Objektivi','Data','Gjatësia fokale','Hapja','Ekspozimi','e pranishme'],
+    'mk' => ['Македонски','Потребен е пристап','Лозинка','Влези','Погрешна лозинка','Почетна','Најавен (дополнителните функции се овозможени)','Ненајавен (потребно за дополнителни функции)','Најавен','Мени','Исчисти кеш','Избриши ги сликичките и GIF-овите од тековната папка','Синхронизирај кеш','Синхронизирај го кешот со тековната содржина на папките','Создај хеш','Одјави се','Најави се','Папки','Фотографии','Не се пронајдени слики.','Прегледувач на фотографии','Затвори го прегледувачот (Esc)','Претходна фотографија (стрелка лево)','Следна фотографија (стрелка десно)','Информации и EXIF податоци (i)','Откажи','Да се избришат СИТЕ сликички и GIF-ови од СИТЕ папки?','Да се избришат сликичките и GIF-от од тековната папка?','Да се синхронизира кешот за СИТЕ папки? Отстранува застарени датотеки и повторно создава сликички што недостасуваат/се стари.','Да се синхронизира кешот за тековната папка? Отстранува застарени датотеки и повторно создава сликички што недостасуваат/се стари.','Грешка при чистење на кешот','Грешка при синхронизација на кешот','Грешка при создавање хеш','Грешка','Кешот е исчистен.\nПапки: {dirs}\nСликички: {thumbs}\nGIF: {gifs}','Синхронизацијата е завршена.','Посетени папки: {v} • сликички: {c} создадени, {r} ажурирани, {x} отстранети • GIF: {g} ажурирани, {y} отстранети','Синхронизација на кешот…','Се анализираат папките и сликичките, почекајте.','Завршено','Внесете ја лозинката','Пристапот е одбиен','Грешка при автентикација','Внесете ја новата лозинка за претворање во хеш (нема автоматски да се зачува):','Хешот е создаден и копиран во привремената меморија:\n\n{hash}\n\nЛепете го во „.config.json“ во „auth_password“.','не е достапно','Јазик','Автоматски (прелистувач)','Димензии','Камера','Објектив','Датум','Фокусна должина','Бленда','Експозиција','присутно'],
+    ];
+}
+
+function mpg_lang_resolve(string $pref): string {
+    $data = mpg_i18n_data();
+    if ($pref !== 'auto' && isset($data[$pref])) return $pref;
+    $cands = [];
+    foreach (explode(',', (string)($_SERVER['HTTP_ACCEPT_LANGUAGE'] ?? '')) as $i => $part) {
+        $bits = explode(';', trim($part));
+        $tag = strtolower(trim($bits[0]));
+        $q = 1.0;
+        if (isset($bits[1]) && preg_match('/q=([0-9.]+)/', $bits[1], $m)) $q = (float)$m[1];
+        if ($tag === '' || $tag === '*' || $q <= 0) continue;
+        $cands[] = [$q, $i, $tag];
+    }
+    usort($cands, fn($a, $b) => ($b[0] <=> $a[0]) ?: ($a[1] <=> $b[1]));
+    foreach ($cands as $c) {
+        $base = explode('-', $c[2])[0];
+        if ($base === 'nb' || $base === 'nn') $base = 'no';
+        if (isset($data[$base])) return $base;
+    }
+    return 'en';
+}
+function mpg_lang_langs(): array {
+    $out = [];
+    foreach (mpg_i18n_data() as $code => $row) $out[$code] = $row[0];
+    return $out;
+}
+// Stringhe nella lingua corrente (fallback inglese), con "\n" letterale convertito in newline
+function mpg_i18n_strings(string $lang): array {
+    $data = mpg_i18n_data();
+    $keys = mpg_i18n_keys();
+    $en = array_combine($keys, array_slice($data['en'], 1));
+    $cur = isset($data[$lang]) ? array_combine($keys, array_slice($data[$lang], 1)) : $en;
+    $out = [];
+    foreach ($keys as $k) {
+        $v = $cur[$k] !== '' ? $cur[$k] : $en[$k];
+        $out[$k] = str_replace('\n', "\n", $v);
+    }
+    return $out;
+}
+$cfg['language'] = (string)($cfg['language'] ?? 'auto');
+if ($cfg['language'] !== 'auto' && !isset(mpg_i18n_data()[$cfg['language']])) { $cfg['language'] = 'auto'; }
+$LANG = mpg_lang_resolve($cfg['language']);
+$I18N = mpg_i18n_strings($LANG);
+function t(string $key, array $params = []): string {
+    global $I18N;
+    $s = $I18N[$key] ?? $key;
+    foreach ($params as $k => $v) $s = str_replace('{' . $k . '}', (string)$v, $s);
+    return $s;
+}
 
 // === SESSIONE E AUTENTICAZIONE SEMPLICE ===
 if (session_status() !== PHP_SESSION_ACTIVE) { @session_start(); }
@@ -301,12 +394,12 @@ if ((int)$cfg['auth_mode'] === 2 && !auth_ok()) {
         if (try_login($_POST['pass'])) {
             header('Location: ' . $self); exit;
         }
-        $err = 'Password errata';
+        $err = t('wrong_password');
     }
     ?><!doctype html>
-    <html lang="it"><head>
+    <html lang="<?php echo htmlspecialchars($LANG,ENT_QUOTES); ?>"><head>
     <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-    <title>Accesso richiesto</title>
+    <title><?php echo htmlspecialchars(t('login_required'),ENT_QUOTES); ?></title>
     <style>
     :root{--bg:#111;--fg:#eee;}
     body{margin:0;min-height:100vh;display:grid;place-items:center;background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;}
@@ -320,8 +413,8 @@ if ((int)$cfg['auth_mode'] === 2 && !auth_ok()) {
     <form method="post" autocomplete="current-password">
       <h1><?php echo htmlspecialchars($cfg['title'],ENT_QUOTES); ?></h1>
       <div class="row">
-        <input name="pass" type="password" placeholder="Password" autofocus autocomplete="current-password" autocapitalize="none" autocorrect="off" spellcheck="false" inputmode="text">
-        <button type="submit">Entra</button>
+        <input name="pass" type="password" placeholder="<?php echo htmlspecialchars(t('password'),ENT_QUOTES); ?>" autofocus autocomplete="current-password" autocapitalize="none" autocorrect="off" spellcheck="false" inputmode="text">
+        <button type="submit"><?php echo htmlspecialchars(t('enter'),ENT_QUOTES); ?></button>
       </div>
       <div class="err"><?php echo isset($err)?htmlspecialchars($err,ENT_QUOTES):''; ?></div>
     </form>
@@ -781,7 +874,7 @@ if (isset($_GET['exif'])) {
     // Dimensioni/MIME (sempre)
     $dims = @getimagesize($srcPath);
     if ($dims) {
-        $out['fields']['Dimensioni'] = ($dims[0] ?? 0) . ' × ' . ($dims[1] ?? 0);
+        $out['fields'][t('dims')] = ($dims[0] ?? 0) . ' × ' . ($dims[1] ?? 0);
         if (!empty($dims['mime'])) $out['fields']['MIME'] = $dims['mime'];
     }
 
@@ -804,13 +897,13 @@ if (isset($_GET['exif'])) {
             $get = function($grp,$key) use ($ex){ return $ex[$grp][$key] ?? null; };
 
             $cam = trim(($get('IFD0','Make') ?? '') . ' ' . ($get('IFD0','Model') ?? ''));
-            if ($cam !== '') $out['fields']['Camera'] = $cam;
+            if ($cam !== '') $out['fields'][t('camera')] = $cam;
 
             $lens = $get('EXIF','UndefinedTag:0xA432') ?? $get('EXIF','LensModel') ?? $get('COMPUTED','LensModel') ?? null;
-            if ($lens) $out['fields']['Obiettivo'] = is_array($lens)? implode(' ', $lens) : $lens;
+            if ($lens) $out['fields'][t('lens')] = is_array($lens)? implode(' ', $lens) : $lens;
 
             $dt = $get('EXIF','DateTimeOriginal') ?? $get('EXIF','CreateDate') ?? $get('IFD0','DateTime') ?? null;
-            if ($dt) $out['fields']['Data'] = preg_replace('/:/','-',substr($dt,0,10),1) . ' ' . substr($dt,11);
+            if ($dt) $out['fields'][t('date')] = preg_replace('/:/','-',substr($dt,0,10),1) . ' ' . substr($dt,11);
 
             $iso = $get('EXIF','PhotographicSensitivity') ?? $get('EXIF','ISOSpeedRatings') ?? null;
             if ($iso) $out['fields']['ISO'] = is_array($iso)? implode(',', $iso) : $iso;
@@ -818,22 +911,22 @@ if (isset($_GET['exif'])) {
             $fl = $get('EXIF','FocalLengthIn35mmFilm') ?? $get('EXIF','FocalLength') ?? null;
             if ($fl) {
                 if (is_string($fl) && strpos($fl,'/')!==false) { list($a,$b)=array_map('floatval', explode('/', $fl, 2)); $fl = $b? ($a/$b) : $a; }
-                $out['fields']['Focale'] = rtrim(rtrim(sprintf('%.1f', (float)$fl), '0'), '.') . ' mm';
+                $out['fields'][t('focal')] = rtrim(rtrim(sprintf('%.1f', (float)$fl), '0'), '.') . ' mm';
             }
 
             $ap = $get('EXIF','FNumber') ?? $get('EXIF','ApertureValue') ?? null;
             if ($ap) {
                 if (is_string($ap) && strpos($ap,'/')!==false) { list($a,$b)=array_map('floatval', explode('/', $ap, 2)); $ap = $b? ($a/$b) : $a; }
-                $out['fields']['Apertura'] = 'f/' . rtrim(rtrim(sprintf('%.1f', (float)$ap), '0'), '.');
+                $out['fields'][t('aperture')] = 'f/' . rtrim(rtrim(sprintf('%.1f', (float)$ap), '0'), '.');
             }
 
             $exp = $get('EXIF','ExposureTime') ?? null;
             if ($exp) {
-                if (is_string($exp) && strpos($exp,'/')!==false) { $out['fields']['Tempo'] = $exp . ' s'; }
-                else { $val = (float)$exp; $out['fields']['Tempo'] = $val >= 1 ? sprintf('%.1f s', $val) : ('1/' . max(1, round(1/$val)) . ' s'); }
+                if (is_string($exp) && strpos($exp,'/')!==false) { $out['fields'][t('exptime')] = $exp . ' s'; }
+                else { $val = (float)$exp; $out['fields'][t('exptime')] = $val >= 1 ? sprintf('%.1f s', $val) : ('1/' . max(1, round(1/$val)) . ' s'); }
             }
 
-            if (!empty($ex['GPS'])) $out['fields']['GPS'] = 'presente';
+            if (!empty($ex['GPS'])) $out['fields']['GPS'] = t('present');
         }
     }
 
@@ -864,13 +957,13 @@ if (isset($_GET['exif'])) {
                     $get = function($grp,$key) use ($ex){ return $ex[$grp][$key] ?? null; };
 
                     $cam = trim(($get('IFD0','Make') ?? '') . ' ' . ($get('IFD0','Model') ?? ''));
-                    if ($cam !== '') $out['fields']['Camera'] = $cam;
+                    if ($cam !== '') $out['fields'][t('camera')] = $cam;
 
                     $lens = $get('EXIF','UndefinedTag:0xA432') ?? $get('EXIF','LensModel') ?? $get('COMPUTED','LensModel') ?? null;
-                    if ($lens) $out['fields']['Obiettivo'] = is_array($lens)? implode(' ', $lens) : $lens;
+                    if ($lens) $out['fields'][t('lens')] = is_array($lens)? implode(' ', $lens) : $lens;
 
                     $dt = $get('EXIF','DateTimeOriginal') ?? $get('EXIF','CreateDate') ?? $get('IFD0','DateTime') ?? null;
-                    if ($dt) $out['fields']['Data'] = preg_replace('/:/','-',substr($dt,0,10),1) . ' ' . substr($dt,11);
+                    if ($dt) $out['fields'][t('date')] = preg_replace('/:/','-',substr($dt,0,10),1) . ' ' . substr($dt,11);
 
                     $iso = $get('EXIF','PhotographicSensitivity') ?? $get('EXIF','ISOSpeedRatings') ?? null;
                     if ($iso) $out['fields']['ISO'] = is_array($iso)? implode(',', $iso) : $iso;
@@ -878,22 +971,22 @@ if (isset($_GET['exif'])) {
                     $fl = $get('EXIF','FocalLengthIn35mmFilm') ?? $get('EXIF','FocalLength') ?? null;
                     if ($fl) {
                         if (is_string($fl) && strpos($fl,'/')!==false) { list($a,$b)=array_map('floatval', explode('/', $fl, 2)); $fl = $b? ($a/$b) : $a; }
-                        $out['fields']['Focale'] = rtrim(rtrim(sprintf('%.1f', (float)$fl), '0'), '.') . ' mm';
+                        $out['fields'][t('focal')] = rtrim(rtrim(sprintf('%.1f', (float)$fl), '0'), '.') . ' mm';
                     }
 
                     $ap = $get('EXIF','FNumber') ?? $get('EXIF','ApertureValue') ?? null;
                     if ($ap) {
                         if (is_string($ap) && strpos($ap,'/')!==false) { list($a,$b)=array_map('floatval', explode('/', $ap, 2)); $ap = $b? ($a/$b) : $a; }
-                        $out['fields']['Apertura'] = 'f/' . rtrim(rtrim(sprintf('%.1f', (float)$ap), '0'), '.');
+                        $out['fields'][t('aperture')] = 'f/' . rtrim(rtrim(sprintf('%.1f', (float)$ap), '0'), '.');
                     }
 
                     $exp = $get('EXIF','ExposureTime') ?? null;
                     if ($exp) {
-                        if (is_string($exp) && strpos($exp,'/')!==false) { $out['fields']['Tempo'] = $exp . ' s'; }
-                        else { $val = (float)$exp; $out['fields']['Tempo'] = $val >= 1 ? sprintf('%.1f s', $val) : ('1/' . max(1, round(1/$val)) . ' s'); }
+                        if (is_string($exp) && strpos($exp,'/')!==false) { $out['fields'][t('exptime')] = $exp . ' s'; }
+                        else { $val = (float)$exp; $out['fields'][t('exptime')] = $val >= 1 ? sprintf('%.1f s', $val) : ('1/' . max(1, round(1/$val)) . ' s'); }
                     }
 
-                    if (!empty($ex['GPS'])) $out['fields']['GPS'] = 'presente';
+                    if (!empty($ex['GPS'])) $out['fields']['GPS'] = t('present');
                 }
             }
 
@@ -907,51 +1000,51 @@ if (isset($_GET['exif'])) {
                 return null;
             };
             // Solo se i campi non sono già stati valorizzati
-            if (empty($out['fields']['Camera'])) {
+            if (empty($out['fields'][t('camera')])) {
                 $camMake  = $getP(['xmp:tiff:Make','xmp:Make','exif:Make']);
                 $camModel = $getP(['xmp:tiff:Model','xmp:Model','exif:Model']);
                 $cam = trim(($camMake?:'') . ' ' . ($camModel?:''));
-                if ($cam !== '') $out['fields']['Camera'] = $cam;
+                if ($cam !== '') $out['fields'][t('camera')] = $cam;
             }
-            if (empty($out['fields']['Obiettivo'])) {
+            if (empty($out['fields'][t('lens')])) {
                 $lens = $getP(['xmp:aux:Lens','xmp:Lens','xmp:exif:LensModel','exif:LensModel']);
-                if ($lens) $out['fields']['Obiettivo'] = $lens;
+                if ($lens) $out['fields'][t('lens')] = $lens;
             }
-            if (empty($out['fields']['Data'])) {
+            if (empty($out['fields'][t('date')])) {
                 $dt = $getP(['xmp:photoshop:DateCreated','xmp:CreateDate','xmp:DateTimeOriginal','exif:DateTimeOriginal','exif:CreateDate']);
                 if ($dt) {
                     if (preg_match('/^\d{4}:\d{2}:\d{2} /', $dt)) {
-                        $out['fields']['Data'] = preg_replace('/:/','-',substr($dt,0,10),1) . ' ' . substr($dt,11);
-                    } else { $out['fields']['Data'] = $dt; }
+                        $out['fields'][t('date')] = preg_replace('/:/','-',substr($dt,0,10),1) . ' ' . substr($dt,11);
+                    } else { $out['fields'][t('date')] = $dt; }
                 }
             }
             if (empty($out['fields']['ISO'])) {
                 $iso = $getP(['xmp:exif:ISOSpeedRatings','exif:ISOSpeedRatings','exif:PhotographicSensitivity']);
                 if ($iso) $out['fields']['ISO'] = is_array($iso)? implode(',', $iso) : $iso;
             }
-            if (empty($out['fields']['Focale'])) {
+            if (empty($out['fields'][t('focal')])) {
                 $fl = $getP(['xmp:exif:FocalLength','exif:FocalLength']);
                 if ($fl) {
                     if (is_string($fl) && strpos($fl,'/')!==false) { list($a,$b)=array_map('floatval', explode('/', $fl, 2)); $fl = $b? ($a/$b) : $a; }
-                    $out['fields']['Focale'] = rtrim(rtrim(sprintf('%.1f', (float)$fl), '0'), '.') . ' mm';
+                    $out['fields'][t('focal')] = rtrim(rtrim(sprintf('%.1f', (float)$fl), '0'), '.') . ' mm';
                 }
             }
-            if (empty($out['fields']['Apertura'])) {
+            if (empty($out['fields'][t('aperture')])) {
                 $ap = $getP(['xmp:exif:FNumber','exif:FNumber','exif:ApertureValue']);
                 if ($ap) {
                     if (is_string($ap) && strpos($ap,'/')!==false) { list($a,$b)=array_map('floatval', explode('/', $ap, 2)); $ap = $b? ($a/$b) : $a; }
-                    $out['fields']['Apertura'] = 'f/' . rtrim(rtrim(sprintf('%.1f', (float)$ap), '0'), '.');
+                    $out['fields'][t('aperture')] = 'f/' . rtrim(rtrim(sprintf('%.1f', (float)$ap), '0'), '.');
                 }
             }
-            if (empty($out['fields']['Tempo'])) {
+            if (empty($out['fields'][t('exptime')])) {
                 $exp = $getP(['xmp:exif:ExposureTime','exif:ExposureTime']);
                 if ($exp) {
-                    if (is_string($exp) && strpos($exp,'/')!==false) { $out['fields']['Tempo'] = $exp . ' s'; }
-                    else { $val = (float)$exp; $out['fields']['Tempo'] = $val >= 1 ? sprintf('%.1f s', $val) : ('1/' . max(1, round(1/$val)) . ' s'); }
+                    if (is_string($exp) && strpos($exp,'/')!==false) { $out['fields'][t('exptime')] = $exp . ' s'; }
+                    else { $val = (float)$exp; $out['fields'][t('exptime')] = $val >= 1 ? sprintf('%.1f s', $val) : ('1/' . max(1, round(1/$val)) . ' s'); }
                 }
             }
             if (empty($out['fields']['GPS']) && ($getP(['exif:GPSLatitude','xmp:exif:GPSLatitude']))) {
-                $out['fields']['GPS'] = 'presente';
+                $out['fields']['GPS'] = t('present');
             }
 
             if (!empty($out['fields'])) $out['has_exif'] = true;
@@ -1018,6 +1111,30 @@ if (!is_dir($thumbDirForView)) { @mkdir($thumbDirForView, 0755, true); }
         'exif' => (bool)$EXIF_AVAILABLE,
         'error' => $ok ? null : ($GLOBALS['__LAST_THUMB_ERR'] ?? 'gen-failed')
     ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
+// === ENDPOINT: imposta lingua (salvata in .config.json) ===
+if (isset($_GET['set_lang'])) {
+    header('Content-Type: application/json; charset=utf-8');
+    header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+    if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') { http_response_code(405); echo json_encode(['ok'=>false,'error'=>'method_not_allowed']); exit; }
+    $payload = json_decode(file_get_contents('php://input'), true) ?: [];
+    if ((int)$cfg['auth_mode'] >= 1) {
+        if (!auth_ok()) { http_response_code(401); echo json_encode(['ok'=>false,'error'=>'unauthorized']); exit; }
+        $csrf = (string)($payload['csrf'] ?? '');
+        if (!isset($_SESSION['csrf']) || !hash_equals($_SESSION['csrf'], $csrf)) {
+            http_response_code(403); echo json_encode(['ok'=>false,'error'=>'forbidden']); exit;
+        }
+    }
+    $lang = (string)($payload['lang'] ?? '');
+    if ($lang !== 'auto' && !isset(mpg_i18n_data()[$lang])) { http_response_code(400); echo json_encode(['ok'=>false,'error'=>'bad_lang']); exit; }
+    $cur = is_file($configFile) ? json_decode((string)@file_get_contents($configFile), true) : [];
+    if (!is_array($cur)) $cur = [];
+    $cur['language'] = $lang;
+    $saved = @file_put_contents($configFile, json_encode($cur, JSON_PRETTY_PRINT|JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE), LOCK_EX);
+    if ($saved === false) { http_response_code(500); echo json_encode(['ok'=>false,'error'=>'write_failed']); exit; }
+    echo json_encode(['ok'=>true,'language'=>$lang]);
     exit;
 }
 
@@ -1421,7 +1538,7 @@ foreach ($files as $path) {
 $pageTitle = $isRoot ? $cfg['title'] : basename($relDir);
 ?>
 <!doctype html>
-<html lang="it">
+<html lang="<?php echo htmlspecialchars($LANG,ENT_QUOTES); ?>">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -1737,6 +1854,7 @@ button { all:unset; }
 ?>
 <script>
   // Prevent DOM XSS / script breakage when embedding variables in inline script tags
+  window.__I18N__ = <?php echo json_encode($I18N, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE); ?>;
   window.__GALLERY_CFG__ = <?php echo json_encode($publicCfg, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE); ?>;
   window.__CUR_DIR__ = <?php echo json_encode($relDir, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE); ?>;
   window.__SELF__ = <?php echo json_encode($self, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE); ?>;
@@ -1746,7 +1864,7 @@ button { all:unset; }
 <header>
   <div class="hdr">
     <nav class="crumbs" aria-label="Breadcrumb">
-      <a href="<?php echo htmlspecialchars($self,ENT_QUOTES); ?>" title="Home">🏠 Home</a>
+      <a href="<?php echo htmlspecialchars($self,ENT_QUOTES); ?>" title="<?php echo htmlspecialchars(t('home'),ENT_QUOTES); ?>">🏠 <?php echo htmlspecialchars(t('home'),ENT_QUOTES); ?></a>
       <?php
         if (!$isRoot) {
           $acc = '';
@@ -1763,44 +1881,56 @@ button { all:unset; }
       <div style="display:flex;align-items:center;gap:6px;">
         <?php if ((int)$cfg['auth_mode'] === 1): ?>
           <div class="auth-ind <?php echo auth_ok() ? 'unlocked' : 'locked'; ?>" role="status" aria-live="polite"
-               title="<?php echo auth_ok() ? 'Accesso eseguito (funzioni extra abilitate)' : 'Non autenticato (richiesto per funzioni extra)'; ?>">
+               title="<?php echo htmlspecialchars(auth_ok() ? t('auth_extra') : t('auth_no'),ENT_QUOTES); ?>">
             <?php echo auth_ok() ? '🔓' : '🔒'; ?>
           </div>
         <?php elseif ((int)$cfg['auth_mode'] === 2 && auth_ok()): ?>
-          <div class="auth-ind unlocked" role="status" aria-live="polite" title="Accesso eseguito">
+          <div class="auth-ind unlocked" role="status" aria-live="polite" title="<?php echo htmlspecialchars(t('auth_in'),ENT_QUOTES); ?>">
             🔓
           </div>
         <?php endif; ?>
         <button class="menu-btn" id="menuToggle" aria-haspopup="true" aria-expanded="false">
-          <span class="ic">☰</span><span>Menu</span>
+          <span class="ic">☰</span><span><?php echo htmlspecialchars(t('menu'),ENT_QUOTES); ?></span>
         </button>
       </div>
-      <div class="menu-list" role="menu" aria-label="Azioni">
+      <div class="menu-list" role="menu" aria-label="<?php echo htmlspecialchars(t('menu'),ENT_QUOTES); ?>">
         <?php if ((int)$cfg['auth_mode'] === 0): ?>
-          <a href="#" id="purgeBtn" class="menu-item" role="menuitem" title="Elimina anteprime e GIF della cartella corrente">
-            <span class="ic">🧹</span><span>Pulisci cache</span>
+          <a href="#" id="purgeBtn" class="menu-item" role="menuitem" title="<?php echo htmlspecialchars(t('purge_t'),ENT_QUOTES); ?>">
+            <span class="ic">🧹</span><span><?php echo htmlspecialchars(t('purge'),ENT_QUOTES); ?></span>
           </a>
-          <a href="#" id="syncBtn" class="menu-item" role="menuitem" title="Sincronizza cache con il contenuto attuale delle cartelle">
-            <span class="ic">🔄</span><span>Sincronizza cache</span>
+          <a href="#" id="syncBtn" class="menu-item" role="menuitem" title="<?php echo htmlspecialchars(t('sync_t'),ENT_QUOTES); ?>">
+            <span class="ic">🔄</span><span><?php echo htmlspecialchars(t('sync'),ENT_QUOTES); ?></span>
           </a>
         <?php elseif ((int)$cfg['auth_mode'] >= 1 && auth_ok()): ?>
-          <a href="#" id="purgeBtn" class="menu-item" role="menuitem" title="Elimina anteprime e GIF della cartella corrente">
-            <span class="ic">🧹</span><span>Pulisci cache</span>
+          <a href="#" id="purgeBtn" class="menu-item" role="menuitem" title="<?php echo htmlspecialchars(t('purge_t'),ENT_QUOTES); ?>">
+            <span class="ic">🧹</span><span><?php echo htmlspecialchars(t('purge'),ENT_QUOTES); ?></span>
           </a>
-          <a href="#" id="syncBtn" class="menu-item" role="menuitem" title="Sincronizza cache con il contenuto attuale delle cartelle">
-            <span class="ic">🔄</span><span>Sincronizza cache</span>
+          <a href="#" id="syncBtn" class="menu-item" role="menuitem" title="<?php echo htmlspecialchars(t('sync_t'),ENT_QUOTES); ?>">
+            <span class="ic">🔄</span><span><?php echo htmlspecialchars(t('sync'),ENT_QUOTES); ?></span>
           </a>
           <a href="#" id="mkHash" class="menu-item" role="menuitem">
-            <span class="ic">🔐</span><span>Crea hash</span>
+            <span class="ic">🔐</span><span><?php echo htmlspecialchars(t('mkhash'),ENT_QUOTES); ?></span>
           </a>
           <div class="menu-sep" aria-hidden="true"></div>
           <a href="?logout=1" class="menu-item" role="menuitem">
-            <span class="ic">🚪</span><span>Esci</span>
+            <span class="ic">🚪</span><span><?php echo htmlspecialchars(t('logout'),ENT_QUOTES); ?></span>
           </a>
         <?php elseif ((int)$cfg['auth_mode'] >= 1 && !auth_ok()): ?>
           <a href="#" id="btnLogin" class="menu-item" role="menuitem">
-            <span class="ic">🔑</span><span>Accedi</span>
+            <span class="ic">🔑</span><span><?php echo htmlspecialchars(t('login'),ENT_QUOTES); ?></span>
           </a>
+        <?php endif; ?>
+        <?php if ((int)$cfg['auth_mode'] === 0 || auth_ok()): ?>
+          <div class="menu-sep" aria-hidden="true"></div>
+          <label class="menu-item" for="langSel">
+            <span class="ic">🌐</span><span><?php echo htmlspecialchars(t('language'),ENT_QUOTES); ?></span>
+            <select id="langSel" aria-label="<?php echo htmlspecialchars(t('language'),ENT_QUOTES); ?>" style="margin-left:auto;max-width:160px;">
+              <option value="auto"<?php echo $cfg['language'] === 'auto' ? ' selected' : ''; ?>><?php echo htmlspecialchars(t('auto'),ENT_QUOTES); ?></option>
+              <?php foreach (mpg_lang_langs() as $lc => $ln): ?>
+                <option value="<?php echo htmlspecialchars($lc,ENT_QUOTES); ?>"<?php echo $cfg['language'] === $lc ? ' selected' : ''; ?>><?php echo htmlspecialchars($ln,ENT_QUOTES); ?></option>
+              <?php endforeach; ?>
+            </select>
+          </label>
         <?php endif; ?>
       </div>
     </div>
@@ -1813,8 +1943,8 @@ button { all:unset; }
     <div class="oprow">
       <div class="opspin" aria-hidden="true"></div>
       <div>
-        <div id="opMsg" class="opmsg">Operazione in corso…</div>
-        <div id="opSub" class="opsub">Attendere, sto sincronizzando la cache.</div>
+        <div id="opMsg" class="opmsg"><?php echo htmlspecialchars(t('sync_title'),ENT_QUOTES); ?></div>
+        <div id="opSub" class="opsub"><?php echo htmlspecialchars(t('sync_sub'),ENT_QUOTES); ?></div>
       </div>
     </div>
   </div>
@@ -1823,7 +1953,7 @@ button { all:unset; }
 <?php if (!empty($subdirs)): ?>
 <section style="padding:0 var(--gap);">
   <h3 id="foldersToggle" style="margin:6px 0 8px 0; font-size:14px; font-weight:600; cursor:pointer; user-select:none;">
-    <span id="foldersCaret" aria-hidden="true">▾</span> Cartelle
+    <span id="foldersCaret" aria-hidden="true">▾</span> <?php echo htmlspecialchars(t('folders'),ENT_QUOTES); ?>
   </h3>
   <div class="grid" id="folders">
     <?php foreach ($subdirs as $sd): ?>
@@ -1834,8 +1964,8 @@ button { all:unset; }
           data-gif="<?php echo htmlspecialchars($sd['gif'] ?? '',ENT_QUOTES); ?>"
           loading="lazy" decoding="async">
         <div class="badges">
-          <?php if ($sd['dirs'] > 0): ?><span class="badge" title="Cartelle">📁 <?php echo (int)$sd['dirs']; ?></span><?php endif; ?>
-          <?php if ($sd['imgs'] > 0): ?><span class="badge" title="Foto">🖼 <?php echo (int)$sd['imgs']; ?></span><?php endif; ?>
+          <?php if ($sd['dirs'] > 0): ?><span class="badge" title="<?php echo htmlspecialchars(t('folders'),ENT_QUOTES); ?>">📁 <?php echo (int)$sd['dirs']; ?></span><?php endif; ?>
+          <?php if ($sd['imgs'] > 0): ?><span class="badge" title="<?php echo htmlspecialchars(t('photos'),ENT_QUOTES); ?>">🖼 <?php echo (int)$sd['imgs']; ?></span><?php endif; ?>
         </div>
         <div class="name" title="<?php echo htmlspecialchars($sd['name'],ENT_QUOTES); ?>"><?php echo htmlspecialchars($sd['name'],ENT_QUOTES); ?></div>
         <div class="progress"><span></span></div>
@@ -1847,9 +1977,9 @@ button { all:unset; }
 <?php endif; ?>
 
 <?php if (empty($items) && empty($subdirs)): ?>
-<p style="padding:16px">Nessuna immagine trovata.</p>
+<p style="padding:16px"><?php echo htmlspecialchars(t('no_images'),ENT_QUOTES); ?></p>
 <?php elseif (!empty($items)): ?>
-<h3 style="margin:6px 0 0 0; padding:0 var(--gap); font-size:14px; font-weight:600;">Foto<?php if (count($items)>0) echo ' ('.count($items).')'; ?></h3>
+<h3 style="margin:6px 0 0 0; padding:0 var(--gap); font-size:14px; font-weight:600;"><?php echo htmlspecialchars(t('photos'),ENT_QUOTES); ?><?php if (count($items)>0) echo ' ('.count($items).')'; ?></h3>
 <main class="grid" id="grid">
 <?php foreach ($items as $idx => $it): ?>
   <figure class="card" data-idx="<?php echo $idx; ?>">
@@ -1868,13 +1998,13 @@ button { all:unset; }
 </main>
 <?php endif; ?>
 
-<div class="lightbox" id="lightbox" role="dialog" aria-modal="true" aria-label="Visualizzatore foto" aria-hidden="true">
+<div class="lightbox" id="lightbox" role="dialog" aria-modal="true" aria-label="<?php echo htmlspecialchars(t('viewer'),ENT_QUOTES); ?>" aria-hidden="true">
   <div class="spinner" id="spinner" aria-hidden="true"></div>
-  <button class="close" id="btnClose" aria-label="Chiudi visualizzatore (Esc)">✕</button>
-  <button class="nav prev" id="btnPrev" aria-label="Foto precedente (Freccia sinistra)">❮</button>
+  <button class="close" id="btnClose" aria-label="<?php echo htmlspecialchars(t('close'),ENT_QUOTES); ?>">✕</button>
+  <button class="nav prev" id="btnPrev" aria-label="<?php echo htmlspecialchars(t('prev'),ENT_QUOTES); ?>">❮</button>
   <div class="lb-img-wrap"><img id="lbImg" alt=""></div>
-  <button class="nav next" id="btnNext" aria-label="Foto successiva (Freccia destra)">❯</button>
-  <button class="info" id="btnInfo" title="Mostra informazioni" aria-label="Informazioni e dati EXIF (i)">ℹ︎</button>
+  <button class="nav next" id="btnNext" aria-label="<?php echo htmlspecialchars(t('next'),ENT_QUOTES); ?>">❯</button>
+  <button class="info" id="btnInfo" title="<?php echo htmlspecialchars(t('info'),ENT_QUOTES); ?>" aria-label="<?php echo htmlspecialchars(t('info'),ENT_QUOTES); ?>">ℹ︎</button>
   <div class="exif" id="exifPanel" aria-live="polite"></div>
   <div class="counter" id="counter"></div>
 </div>
@@ -1882,13 +2012,13 @@ button { all:unset; }
 <!-- Modal login per auth_mode >= 1 -->
 <div id="loginModal" style="position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.55);z-index:10000;">
   <div style="background:#1b1b1b;color:#fff;border:1px solid rgba(255,255,255,.2);border-radius:12px;box-shadow:0 12px 32px rgba(0,0,0,.5);padding:16px;min-width:280px;max-width:90vw;">
-    <div style="font-weight:700;margin-bottom:10px;">Accesso</div>
-    <label for="loginPass" style="font-size:12px;opacity:.8;">Password</label>
-    <input id="loginPass" type="password" placeholder="Password" style="width:100%;padding:10px 12px;margin-top:6px;border-radius:8px;border:1px solid #333;background:#0f0f0f;color:#fff;" autocomplete="current-password" autocapitalize="none" autocorrect="off" spellcheck="false" inputmode="text">
+    <div style="font-weight:700;margin-bottom:10px;"><?php echo htmlspecialchars(t('login_required'),ENT_QUOTES); ?></div>
+    <label for="loginPass" style="font-size:12px;opacity:.8;"><?php echo htmlspecialchars(t('password'),ENT_QUOTES); ?></label>
+    <input id="loginPass" type="password" placeholder="<?php echo htmlspecialchars(t('password'),ENT_QUOTES); ?>" style="width:100%;padding:10px 12px;margin-top:6px;border-radius:8px;border:1px solid #333;background:#0f0f0f;color:#fff;" autocomplete="current-password" autocapitalize="none" autocorrect="off" spellcheck="false" inputmode="text">
     <div id="loginErr" style="height:14px;color:#ffb3b3;font-size:12px;margin-top:6px;"></div>
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px;">
-      <button id="loginCancel" style="padding:8px 10px;border-radius:8px;border:1px solid #333;background:#222;color:#fff;cursor:pointer;">Annulla</button>
-      <button id="loginSubmit" style="padding:8px 10px;border-radius:8px;border:1px solid #333;background:#2a6fef;color:#fff;cursor:pointer;">Accedi</button>
+      <button id="loginCancel" style="padding:8px 10px;border-radius:8px;border:1px solid #333;background:#222;color:#fff;cursor:pointer;"><?php echo htmlspecialchars(t('cancel'),ENT_QUOTES); ?></button>
+      <button id="loginSubmit" style="padding:8px 10px;border-radius:8px;border:1px solid #333;background:#2a6fef;color:#fff;cursor:pointer;"><?php echo htmlspecialchars(t('login'),ENT_QUOTES); ?></button>
     </div>
   </div>
 </div>
@@ -1896,6 +2026,10 @@ button { all:unset; }
 <script>
 (() => {
   // Prevent DOM XSS / script breakage when embedding array items in inline script tags
+  const I18N = window.__I18N__ || {};
+  const L = (k, p) => { let s = I18N[k] || k; if (p) for (const n in p) s = s.split('{' + n + '}').join(String(p[n])); return s; };
+  const syncSummary = (s) => L('sync_sum', { v: s.visited||0, c: s.created_thumbs||0, r: s.regen_thumbs||0, x: s.removed_thumbs||0, g: s.regen_gifs||0, y: s.removed_gifs||0 });
+  window.__L__ = L; window.__syncSummary__ = syncSummary;
   const items = <?php echo json_encode($items, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE); ?>;
   const grid = document.getElementById('grid');
   const lb = document.getElementById('lightbox');
@@ -1927,8 +2061,8 @@ button { all:unset; }
     e.preventDefault();
     const isRoot = !window.__CUR_DIR__;
     const msg = isRoot
-      ? 'Eliminare TUTTE le anteprime e GIF di TUTTE le cartelle?'
-      : 'Eliminare le anteprime e la GIF della cartella corrente?';
+      ? L('c_purge_all')
+      : L('c_purge_dir');
     if (!confirm(msg)) return;
 
     const url = withDir(`${window.__SELF__}?purge_cache=1&t=${Date.now()}`);
@@ -1944,12 +2078,12 @@ button { all:unset; }
     .then(r=>r.json())
     .then(d=>{
       if (d && d.ok) {
-        alert(`Cache pulita.\nCartelle toccate: ${d.purged.dirs}\nThumbs: ${d.purged.thumbs}\nGIF: ${d.purged.gifs}`);
+        alert(L('purge_done', { dirs: d.purged.dirs, thumbs: d.purged.thumbs, gifs: d.purged.gifs }));
         location.reload();
       } else {
-        alert('Errore nella pulizia cache');
+        alert(L('e_purge'));
       }
-    }).catch(()=>alert('Errore nella pulizia cache'));
+    }).catch(()=>alert(L('e_purge')));
   });
 
 // Sincronizza cache
@@ -1958,8 +2092,8 @@ syncBtn?.addEventListener('click', (e)=>{
   e.preventDefault();
   const isRoot = !window.__CUR_DIR__;
   const msg = isRoot
-    ? 'Sincronizzare la cache su TUTTE le cartelle? Rimuove file obsoleti e rigenera miniature mancanti/vecchie.'
-    : 'Sincronizzare la cache sulla cartella corrente? Rimuove file obsoleti e rigenera miniature mancanti/vecchie.';
+    ? L('c_sync_all')
+    : L('c_sync_dir');
   if (!confirm(msg)) return;
 
   const url = withDir(`${window.__SELF__}?sync_cache=1&t=${Date.now()}`);
@@ -1976,22 +2110,13 @@ syncBtn?.addEventListener('click', (e)=>{
   .then(d=>{
     if (d && d.ok) {
       const s=d.summary||{};
-      alert(
-        'Sincronizzazione completata.\n' +
-        `Cartelle visitate: ${s.visited||0}\n` +
-        `Thumb create: ${s.created_thumbs||0}\n` +
-        `Thumb rigenerate: ${s.regen_thumbs||0}\n` +
-        `Thumb rimosse: ${s.removed_thumbs||0}\n` +
-        `GIF rigenerate: ${s.regen_gifs||0}\n` +
-        `GIF rimosse: ${s.removed_gifs||0}\n` +
-        `Cartelle cache rimosse: ${s.removed_dirs||0}`
-      );
+      alert(L('sync_done') + '\n' + syncSummary(s));
       location.reload();
     } else {
-      alert('Errore nella sincronizzazione cache');
+      alert(L('e_sync'));
     }
   })
-  .catch(()=>alert('Errore nella sincronizzazione'));
+  .catch(()=>alert(L('e_sync')));
 });
 
   // Collassa/espandi “Cartelle”
@@ -2047,7 +2172,7 @@ syncBtn?.addEventListener('click', (e)=>{
 
   function doLogin(){
     const pwd = (loginPass?.value || '').toString();
-    if (!pwd) { if (loginErr) loginErr.textContent = 'Inserisci la password'; return; }
+    if (!pwd) { if (loginErr) loginErr.textContent = L('enter_pwd'); return; }
     fetch(`${window.__SELF__}?do_login=1`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -2056,29 +2181,44 @@ syncBtn?.addEventListener('click', (e)=>{
     .then(r=>r.json())
     .then(d=>{
       if (d && d.ok) { location.reload(); }
-      else { if (loginErr) loginErr.textContent = 'Accesso negato'; }
+      else { if (loginErr) loginErr.textContent = L('denied'); }
     })
-    .catch(()=>{ if (loginErr) loginErr.textContent = 'Errore di autenticazione'; });
+    .catch(()=>{ if (loginErr) loginErr.textContent = L('auth_err'); });
   }
   loginSubmit?.addEventListener('click', (e)=>{ e.preventDefault(); doLogin(); });
   loginPass?.addEventListener('keydown', (e)=>{ if (e.key === 'Enter') { e.preventDefault(); doLogin(); } });
+
+  // Selettore lingua: salva la scelta in .config.json
+  document.getElementById('langSel')?.addEventListener('change', (e) => {
+    const body = { lang: e.target.value };
+    if ((window.__AUTH_MODE__ || 0) >= 1) body.csrf = window.__CSRF__ || '';
+    fetch(`${window.__SELF__}?set_lang=1`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      cache: 'no-store',
+      body: JSON.stringify(body)
+    })
+    .then(r => r.json())
+    .then(d => { if (d && d.ok) location.reload(); else alert(L('e_generic')); })
+    .catch(() => alert(L('e_generic')));
+  });
 
   // Handler Crea hash
   const mkHashLink = document.getElementById('mkHash');
   mkHashLink?.addEventListener('click', (e) => {
     e.preventDefault();
-    const pwd = prompt('Inserisci la nuova password da trasformare in hash (non verrà salvata automaticamente):');
+    const pwd = prompt(L('hash_prompt'));
     if (!pwd) return;
     fetch(withDir(`${window.__SELF__}?mkhash=${encodeURIComponent(pwd)}`), { cache:'no-store' })
       .then(r=>r.json())
       .then(d=>{
         if (d && d.ok && d.hash) {
           navigator.clipboard?.writeText(d.hash).catch(()=>{});
-          alert('Hash generato e copiato negli appunti:\n\n' + d.hash + '\n\nIncollalo in ".config.json" su "auth_password".');
+          alert(L('hash_done', { hash: d.hash }));
         } else {
-          alert('Errore nella generazione hash');
+          alert(L('e_hash'));
         }
-      }).catch(()=>{ alert('Errore'); });
+      }).catch(()=>{ alert(L('e_generic')); });
   });
 
   // Lightbox
@@ -2167,7 +2307,7 @@ syncBtn?.addEventListener('click', (e)=>{
       k.textContent = 'EXIF';
       const v = document.createElement('div');
       v.className = 'v';
-      v.textContent = 'non disponibili';
+      v.textContent = L('exif_na');
       g.append(k, v);
     } else {
       h.textContent = d.name || 'Info';
@@ -2311,13 +2451,14 @@ syncBtn?.addEventListener('click', (e)=>{
 </script>
 <script>
 (function(){
+  const L = window.__L__, syncSummary = window.__syncSummary__;
   const elOv  = document.getElementById('opOverlay');
   const elMsg = document.getElementById('opMsg');
   const elSub = document.getElementById('opSub');
 
   function openOverlay(msg, sub){
     if (!elOv) return;
-    elMsg.textContent = msg || 'Operazione in corso…';
+    elMsg.textContent = msg || L('sync_title');
     elSub.textContent = sub || '';
     elOv.classList.add('open');
     elOv.removeAttribute('hidden');
@@ -2350,17 +2491,16 @@ syncBtn?.addEventListener('click', (e)=>{
     syncBtn.addEventListener('click', async (e)=>{
       e.preventDefault();
       e.stopImmediatePropagation(); // evita eventuali handler duplicati
-      openOverlay('Sincronizzazione cache…', 'Analisi cartelle e anteprime, attendere.');
+      openOverlay(L('sync_title'), L('sync_sub'));
       try{
         const url = window.__SELF__ + '?sync_cache=1&dir=' + encodeURIComponent(window.__CUR_DIR__ || '');
         const res = await postJSON(url, { recursive: true });
         const s = res.summary || {};
-        setOverlay('Completato',
-          `Visitate ${s.visited||0} cartelle • create ${s.created_thumbs||0}, aggiornate ${s.regen_thumbs||0}, rimosse ${s.removed_thumbs||0} anteprime • GIF aggiornate ${s.regen_gifs||0}, rimosse ${s.removed_gifs||0}`);
+        setOverlay(L('done'), syncSummary(s));
         setTimeout(()=>{ closeOverlay(); location.reload(); }, 1100);
       } catch(err){
-        const msg = (err && err.json && err.json.error) ? err.json.error : (err.message || 'Errore');
-        setOverlay('Errore durante la sincronizzazione', msg);
+        const msg = (err && err.json && err.json.error) ? err.json.error : (err.message || L('e_generic'));
+        setOverlay(L('e_sync'), msg);
         setTimeout(()=> closeOverlay(), 1600);
       }
     });

@@ -9,6 +9,14 @@ Just simply use my [docker image](https://github.com/napalmz/httpd-base), as sho
 
 ![Magic Photo Gallery screenshot](./screenshot.png)
 
+## Languages
+
+The UI is translated into 32 European languages (en, it, fr, de, es, pt, nl, pl, ro, cs, sk, sl, hr, bg, el, hu, fi, sv, da, no, is, et, lv, lt, ga, mt, ca, uk, ru, sr, sq, mk).
+
+- By default the language follows the browser (`Accept-Language`), falling back to English.
+- The menu has a language selector; the choice is saved in `.Magic-Photo-Gallery/.config.json` (`"language": "auto"` or a code such as `"de"`).
+- The saved language is global for all visitors. With `auth_mode` 1/2 only logged-in users can change it.
+
 ## Deployment
 
 First, move to your image directory and download the app:
