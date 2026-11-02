@@ -2130,19 +2130,39 @@ syncBtn?.addEventListener('click', (e)=>{
   const exifPanel = document.getElementById('exifPanel');
 
   function renderExif(d){
-    if (!exifPanel) return; 
+    if (!exifPanel) return;
+    // SECURITY: Use safe DOM methods and textContent to prevent DOM XSS from image filenames or EXIF metadata
+    exifPanel.textContent = '';
+    const h = document.createElement('div');
+    h.className = 'h';
+    const g = document.createElement('div');
+    g.className = 'g';
+
     if (!d || !d.ok) {
-      exifPanel.innerHTML = '<div class="h">Info</div><div class="g"><div class="k">EXIF</div><div class="v">non disponibili</div></div>';
-      return;
+      h.textContent = 'Info';
+      const k = document.createElement('div');
+      k.className = 'k';
+      k.textContent = 'EXIF';
+      const v = document.createElement('div');
+      v.className = 'v';
+      v.textContent = 'non disponibili';
+      g.append(k, v);
+    } else {
+      h.textContent = d.name || 'Info';
+      const f = d.fields || {};
+      for (const k of Object.keys(f)) {
+        const val = Array.isArray(f[k]) ? f[k].join(', ') : String(f[k]);
+        const kEl = document.createElement('div');
+        kEl.className = 'k';
+        kEl.textContent = k;
+        const vEl = document.createElement('div');
+        vEl.className = 'v';
+        vEl.title = val;
+        vEl.textContent = val;
+        g.append(kEl, vEl);
+      }
     }
-    const f = d.fields || {};
-    const rows = [];
-    for (const k of Object.keys(f)) {
-      const val = Array.isArray(f[k]) ? f[k].join(', ') : String(f[k]);
-      const esc = (s)=>s.replace(/&/g,'&amp;').replace(/</g,'&lt;');
-      rows.push(`<div class="k">${esc(k)}</div><div class="v" title="${esc(val)}">${esc(val)}</div>`);
-    }
-    exifPanel.innerHTML = `<div class="h">${(d.name||'Info')}</div><div class="g">${rows.join('')}</div>`;
+    exifPanel.append(h, g);
   }
   function toggleExif(){ exifPanel?.classList.toggle('open'); }
   btnInfo?.addEventListener('click', (e)=>{ e.preventDefault(); toggleExif(); });
