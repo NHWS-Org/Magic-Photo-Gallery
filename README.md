@@ -7,7 +7,7 @@ Just simply use my [docker image](https://github.com/napalmz/httpd-base), as sho
 
 ## Screenshots
 
-![App Screenshot](https://via.placeholder.com/468x300?text=App+Screenshot+Here)
+![Magic Photo Gallery screenshot](./screenshot.png)
 
 ## Deployment
 
