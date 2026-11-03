@@ -1523,10 +1523,14 @@ $files = list_images($currentAbs);
 
 // === PREPARA DATI ===
 $items = [];
+// Performance optimization (Bolt ⚡): Read existing thumbnails once into an associative lookup map.
+// Replaces N file_exists() filesystem stat calls with O(1) hash lookups, speeding up gallery rendering on large albums.
+$existingThumbs = is_dir($thumbDirForView) ? array_flip(scandir($thumbDirForView) ?: []) : [];
 foreach ($files as $path) {
     $name = basename($path);
-    $thumbPath = $thumbDirForView . '/' . thumb_name($name);
-    $hasThumb = file_exists($thumbPath);
+    $tName = thumb_name($name);
+    $thumbPath = $thumbDirForView . '/' . $tName;
+    $hasThumb = isset($existingThumbs[$tName]);
     $items[] = [
         'name'     => htmlspecialchars($name, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'),
         'src'      => htmlspecialchars(rel($path), ENT_QUOTES),
