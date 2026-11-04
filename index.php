@@ -1471,78 +1471,85 @@ if (isset($_GET['sync_cache'])) {
 }
 
 // === SCANSIONE: sottocartelle e file immagini nella cartella corrente ===
+// Performance optimization (Bolt ⚡):
+// 1. Collect subdirectories and image files in a single pass of $currentAbs instead of scanning twice.
+// 2. Pre-scan the thumbnail directory once into a hash set ($existingThumbs) so checking if each
+//    image has a thumbnail is an O(1) in-memory lookup instead of N disk stat/file_exists calls.
 $subdirs = [];
+$files = [];
 $dIt = @scandir($currentAbs) ?: [];
 foreach ($dIt as $entry) {
     if ($entry === '.' || $entry === '..') continue;
     $abs = $currentAbs . '/' . $entry;
-    if (!is_dir($abs)) continue;
-    $rel = ltrim(($relDir ? $relDir . '/' : '') . $entry, '/');
-    if (is_excluded_dir($entry, $rel)) continue;
-    // Performance optimization (Bolt ⚡): Count immediate images and subdirectories in a single pass.
-    // Avoids redundant scandir(), array allocations, and natsort() overhead from list_images().
-    $imgCount = 0;
-    $dirCount = 0;
-    $scanInner = @scandir($abs) ?: [];
-    foreach ($scanInner as $e2) {
-        if ($e2 === '.' || $e2 === '..') continue;
-        if ($e2[0] === '.') continue;
-        $abs2 = $abs . '/' . $e2;
-        if (is_dir($abs2)) {
-            $rel2 = ltrim(($rel ? $rel . '/' : '') . $e2, '/');
-            if (is_excluded_dir($e2, $rel2)) continue;
-            $dirCount++;
-        } elseif (is_file($abs2) && is_image_ext($abs2)) {
-            $imgCount++;
+    if (is_dir($abs)) {
+        $rel = ltrim(($relDir ? $relDir . '/' : '') . $entry, '/');
+        if (is_excluded_dir($entry, $rel)) continue;
+        $imgCount = 0;
+        $dirCount = 0;
+        $scanInner = @scandir($abs) ?: [];
+        foreach ($scanInner as $e2) {
+            if ($e2 === '.' || $e2 === '..') continue;
+            if ($e2[0] === '.') continue;
+            $abs2 = $abs . '/' . $e2;
+            if (is_dir($abs2)) {
+                $rel2 = ltrim(($rel ? $rel . '/' : '') . $e2, '/');
+                if (is_excluded_dir($e2, $rel2)) continue;
+                $dirCount++;
+            } elseif (is_file($abs2) && is_image_ext($abs2)) {
+                $imgCount++;
+            }
         }
+        // GIF path
+        $gifAbs = ($rel === '' ? ($thumbsRoot . '/' . $folderGifName) : ($thumbsRoot . '/' . implode('/', array_map(fn($seg) => $prefFolder.$seg, explode('/', $rel))) . '/' . $folderGifName));
+        // Placeholder SVG per "cartella annidata" quando non ci sono foto ma ci sono sottocartelle
+        $placeholder = null;
+        if (!file_exists($gifAbs) && $imgCount === 0 && $dirCount > 0) {
+            $svg = '<?xml version="1.0" encoding="UTF-8"?>'
+                 . '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 150" preserveAspectRatio="xMidYMid slice">'
+                 . '<defs>'
+                 . '  <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">'
+                 . '    <stop offset="0" stop-color="#eef1f5"/><stop offset="1" stop-color="#e3e6ea"/>'
+                 . '  </linearGradient>'
+                 . '  <linearGradient id="folder" x1="0" y1="0" x2="0" y2="1">'
+                 . '    <stop offset="0" stop-color="#ffd36b"/><stop offset="1" stop-color="#f0b548"/>'
+                 . '  </linearGradient>'
+                 . '  <filter id="soft" x="-10%" y="-10%" width="120%" height="120%"><feGaussianBlur in="SourceAlpha" stdDeviation="2"/><feOffset dy="1"/><feComponentTransfer><feFuncA type="linear" slope="0.35"/></feComponentTransfer><feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge></filter>'
+                 . '</defs>'
+                 . '<rect width="200" height="150" rx="16" fill="url(#bg)"/>'
+                 . '<g transform="translate(20,36)" filter="url(#soft)">'
+                 . '  <!-- linguetta -->'
+                 . '  <path d="M18 6h32c6 0 10 2 13 6l5 6h78a12 12 0 0 1 12 12v48a12 12 0 0 1-12 12H12A12 12 0 0 1 0 78V18A12 12 0 0 1 12 6z" fill="url(#folder)" stroke="#d39f43" stroke-width="1"/>'
+                 . '  <!-- documenti stilizzati -->'
+                 . '  <g opacity=".9" transform="translate(24,28)">'
+                 . '    <rect x="0" y="8" width="50" height="34" rx="6" fill="#fff" stroke="#d9d9d9"/>'
+                 . '    <rect x="10" y="0" width="60" height="38" rx="6" fill="#fff" stroke="#d9d9d9"/>'
+                 . '  </g>'
+                 . '  <!-- indice cartelle -->'
+                 . '  <g opacity=".8" transform="translate(110,24)">'
+                 . '    <rect x="0" y="0" width="48" height="30" rx="6" fill="#fff" stroke="#d9d9d9"/>'
+                 . '    <path d="M12 9h24M12 15h24M12 21h24" stroke="#a0a0a0" stroke-width="3" stroke-linecap="round"/>'
+                 . '  </g>'
+                 . '</g>'
+                 . '</svg>';
+            $placeholder = 'data:image/svg+xml;base64,' . base64_encode($svg);
+        }
+        $subdirs[] = [
+            'name' => $entry,
+            'rel'  => $rel,
+            'gif'  => file_exists($gifAbs) ? rel_url($gifAbs) : null,
+            'imgs' => $imgCount,
+            'dirs' => $dirCount,
+            'placeholder' => $placeholder
+        ];
+    } elseif ($entry[0] !== '.' && is_file($abs) && is_image_ext($abs)) {
+        $files[] = $abs;
     }
-    // GIF path
-    $gifAbs = ($rel === '' ? ($thumbsRoot . '/' . $folderGifName) : ($thumbsRoot . '/' . implode('/', array_map(fn($seg) => $prefFolder.$seg, explode('/', $rel))) . '/' . $folderGifName));
-    // Placeholder SVG per "cartella annidata" quando non ci sono foto ma ci sono sottocartelle
-    $placeholder = null;
-    if (!file_exists($gifAbs) && $imgCount === 0 && $dirCount > 0) {
-        $svg = '<?xml version="1.0" encoding="UTF-8"?>'
-             . '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 150" preserveAspectRatio="xMidYMid slice">'
-             . '<defs>'
-             . '  <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">'
-             . '    <stop offset="0" stop-color="#eef1f5"/><stop offset="1" stop-color="#e3e6ea"/>'
-             . '  </linearGradient>'
-             . '  <linearGradient id="folder" x1="0" y1="0" x2="0" y2="1">'
-             . '    <stop offset="0" stop-color="#ffd36b"/><stop offset="1" stop-color="#f0b548"/>'
-             . '  </linearGradient>'
-             . '  <filter id="soft" x="-10%" y="-10%" width="120%" height="120%"><feGaussianBlur in="SourceAlpha" stdDeviation="2"/><feOffset dy="1"/><feComponentTransfer><feFuncA type="linear" slope="0.35"/></feComponentTransfer><feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge></filter>'
-             . '</defs>'
-             . '<rect width="200" height="150" rx="16" fill="url(#bg)"/>'
-             . '<g transform="translate(20,36)" filter="url(#soft)">'
-             . '  <!-- linguetta -->'
-             . '  <path d="M18 6h32c6 0 10 2 13 6l5 6h78a12 12 0 0 1 12 12v48a12 12 0 0 1-12 12H12A12 12 0 0 1 0 78V18A12 12 0 0 1 12 6z" fill="url(#folder)" stroke="#d39f43" stroke-width="1"/>'
-             . '  <!-- documenti stilizzati -->'
-             . '  <g opacity=".9" transform="translate(24,28)">'
-             . '    <rect x="0" y="8" width="50" height="34" rx="6" fill="#fff" stroke="#d9d9d9"/>'
-             . '    <rect x="10" y="0" width="60" height="38" rx="6" fill="#fff" stroke="#d9d9d9"/>'
-             . '  </g>'
-             . '  <!-- indice cartelle -->'
-             . '  <g opacity=".8" transform="translate(110,24)">'
-             . '    <rect x="0" y="0" width="48" height="30" rx="6" fill="#fff" stroke="#d9d9d9"/>'
-             . '    <path d="M12 9h24M12 15h24M12 21h24" stroke="#a0a0a0" stroke-width="3" stroke-linecap="round"/>'
-             . '  </g>'
-             . '</g>'
-             . '</svg>';
-        $placeholder = 'data:image/svg+xml;base64,' . base64_encode($svg);
-    }
-    $subdirs[] = [
-        'name' => $entry,
-        'rel'  => $rel,
-        'gif'  => file_exists($gifAbs) ? rel_url($gifAbs) : null,
-        'imgs' => $imgCount,
-        'dirs' => $dirCount,
-        'placeholder' => $placeholder
-    ];
 }
-// immagini nella cartella corrente
-$files = list_images($currentAbs);
+natsort($files);
+$files = array_values($files);
 
 // === PREPARA DATI ===
+$existingThumbs = is_dir($thumbDirForView) ? array_fill_keys(@scandir($thumbDirForView) ?: [], true) : [];
 $items = [];
 // Performance optimization (Bolt ⚡): Read existing thumbnails once into an associative lookup map.
 // Replaces N file_exists() filesystem stat calls with O(1) hash lookups, speeding up gallery rendering on large albums.
