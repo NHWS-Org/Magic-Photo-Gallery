@@ -1500,6 +1500,7 @@ foreach ($dIt as $entry) {
         $rel = ltrim(($relDir ? $relDir . '/' : '') . $entry, '/');
         if (is_excluded_dir($entry, $rel)) continue;
         $imgCount = 0;
+        $imgSize = 0;
         $dirCount = 0;
         $scanInner = @scandir($abs) ?: [];
         foreach ($scanInner as $e2) {
@@ -1512,6 +1513,7 @@ foreach ($dIt as $entry) {
                 $dirCount++;
             } elseif (is_file($abs2) && is_image_ext($abs2)) {
                 $imgCount++;
+                $imgSize += (int)(@filesize($abs2) ?: 0);
             }
         }
         // GIF path
@@ -1553,6 +1555,7 @@ foreach ($dIt as $entry) {
             'rel'  => $rel,
             'gif'  => file_exists($gifAbs) ? rel_url($gifAbs) : null,
             'imgs' => $imgCount,
+            'size' => $imgSize,
             'dirs' => $dirCount,
             'placeholder' => $placeholder
         ];
@@ -1574,10 +1577,12 @@ foreach ($files as $path) {
     $tName = thumb_name($name);
     $thumbPath = $thumbDirForView . '/' . $tName;
     $hasThumb = isset($existingThumbs[$tName]);
+    $sortDate = image_sort_timestamp($path);
     $items[] = [
         'name'     => htmlspecialchars($name, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'),
         'sortName' => $name,
-        'sortDate' => image_sort_timestamp($path),
+        'sortDate' => $sortDate,
+        'sortDateLabel' => date('Y-m-d H:i:s', $sortDate),
         'sortSize' => (int)(@filesize($path) ?: 0),
         'src'      => htmlspecialchars(rel($path), ENT_QUOTES),
         'thumb'    => htmlspecialchars(rel($thumbPath), ENT_QUOTES),
@@ -1588,8 +1593,11 @@ usort($items, fn($a, $b) => ($a['sortDate'] <=> $b['sortDate']) ?: strnatcasecmp
 
 $pageTitle = $isRoot ? $cfg['title'] : basename($relDir);
 $sortLabels = $LANG === 'it'
-    ? ['sort'=>'Ordina foto','date-asc'=>'Data (meno recenti)','date-desc'=>'Data (più recenti)','name-asc'=>'Nome (A-Z)','name-desc'=>'Nome (Z-A)','size-asc'=>'Dimensione (minore)','size-desc'=>'Dimensione (maggiore)','file_size'=>'Dimensione file']
-    : ['sort'=>'Sort photos','date-asc'=>'Date (oldest first)','date-desc'=>'Date (newest first)','name-asc'=>'Name (A-Z)','name-desc'=>'Name (Z-A)','size-asc'=>'Size (smallest first)','size-desc'=>'Size (largest first)','file_size'=>'File size'];
+    ? ['sort'=>'Ordina foto','date-asc'=>'Data (meno recenti)','date-desc'=>'Data (più recenti)','name-asc'=>'Nome (A-Z)','name-desc'=>'Nome (Z-A)','size-asc'=>'Dimensione (minore)','size-desc'=>'Dimensione (maggiore)','file_size'=>'Dimensione file','date_value'=>'Data','name_value'=>'Nome','size_value'=>'Dimensione']
+    : ['sort'=>'Sort photos','date-asc'=>'Date (oldest first)','date-desc'=>'Date (newest first)','name-asc'=>'Name (A-Z)','name-desc'=>'Name (Z-A)','size-asc'=>'Size (smallest first)','size-desc'=>'Size (largest first)','file_size'=>'File size','date_value'=>'Date','name_value'=>'Name','size_value'=>'Size'];
+$folderSortLabels = $LANG === 'it'
+    ? ['sort'=>'Ordina cartelle','name-asc'=>'Nome (A-Z)','name-desc'=>'Nome (Z-A)','count-asc'=>'Meno foto','count-desc'=>'Più foto','size-asc'=>'Contenuto più piccolo','size-desc'=>'Contenuto più grande']
+    : ['sort'=>'Sort folders','name-asc'=>'Name (A-Z)','name-desc'=>'Name (Z-A)','count-asc'=>'Fewest photos','count-desc'=>'Most photos','size-asc'=>'Smallest contents','size-desc'=>'Largest contents'];
 ?>
 <!doctype html>
 <html lang="<?php echo htmlspecialchars($LANG,ENT_QUOTES); ?>">
@@ -1674,6 +1682,15 @@ header { padding: 12px 16px; font-weight: 600; }
 .photo-heading h3 { margin:0; font-size:inherit; font-weight:600; }
 .photo-heading label { display:flex; align-items:center; gap:6px; font-size:12px; }
 .photo-heading select { max-width:min(220px, 55vw); }
+.folders-heading {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+}
+.folders-heading h3 { margin:6px 0 8px; font-size:14px; font-weight:600; }
+.folders-heading label { display:flex; align-items:center; gap:6px; font-size:12px; }
+.folders-heading select { max-width:min(220px, 55vw); }
 /* Mobile: smaller thumbnails to fit more per screen */
 @media (max-width: 720px){
   .grid{
@@ -2035,12 +2052,21 @@ button { all:unset; }
 
 <?php if (!empty($subdirs)): ?>
 <section style="padding:0 var(--gap);">
-  <h3 id="foldersToggle" style="margin:6px 0 8px 0; font-size:14px; font-weight:600; cursor:pointer; user-select:none;">
-    <span id="foldersCaret" aria-hidden="true">▾</span> <?php echo htmlspecialchars(t('folders'),ENT_QUOTES); ?>
-  </h3>
+  <div class="folders-heading">
+    <h3 id="foldersToggle" style="cursor:pointer; user-select:none;">
+      <span id="foldersCaret" aria-hidden="true">▾</span> <?php echo htmlspecialchars(t('folders'),ENT_QUOTES); ?>
+    </h3>
+    <label for="folderSort"><?php echo htmlspecialchars($folderSortLabels['sort'],ENT_QUOTES); ?>
+      <select id="folderSort">
+        <?php foreach (['name-asc','name-desc','count-asc','count-desc','size-asc','size-desc'] as $sortOption): ?>
+          <option value="<?php echo htmlspecialchars($sortOption,ENT_QUOTES); ?>"><?php echo htmlspecialchars($folderSortLabels[$sortOption],ENT_QUOTES); ?></option>
+        <?php endforeach; ?>
+      </select>
+    </label>
+  </div>
   <div class="grid" id="folders">
     <?php foreach ($subdirs as $sd): ?>
-      <a class="card" href="<?php echo htmlspecialchars($self,ENT_QUOTES); ?>?dir=<?php echo rawurlencode($sd['rel']); ?>" data-rel="<?php echo htmlspecialchars($sd['rel'],ENT_QUOTES); ?>" data-has-imgs="<?php echo ($sd['imgs']>0)?'1':'0'; ?>" style="display:block; text-decoration:none; color:inherit;">
+      <a class="card" href="<?php echo htmlspecialchars($self,ENT_QUOTES); ?>?dir=<?php echo rawurlencode($sd['rel']); ?>" data-rel="<?php echo htmlspecialchars($sd['rel'],ENT_QUOTES); ?>" data-has-imgs="<?php echo ($sd['imgs']>0)?'1':'0'; ?>" data-imgs="<?php echo (int)$sd['imgs']; ?>" data-size="<?php echo (int)$sd['size']; ?>" data-name="<?php echo htmlspecialchars($sd['name'],ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); ?>" style="display:block; text-decoration:none; color:inherit;">
         <img
           src="<?php echo $sd['gif'] ? htmlspecialchars($sd['gif'],ENT_QUOTES) : ($sd['placeholder'] ? $sd['placeholder'] : 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw=='); ?>"
           alt="<?php echo htmlspecialchars($sd['name'],ENT_QUOTES); ?>"
@@ -2124,6 +2150,7 @@ button { all:unset; }
   const syncSummary = (s) => L('sync_sum', { v: s.visited||0, c: s.created_thumbs||0, r: s.regen_thumbs||0, x: s.removed_thumbs||0, g: s.regen_gifs||0, y: s.removed_gifs||0 });
   window.__L__ = L; window.__syncSummary__ = syncSummary;
   const items = <?php echo json_encode($items, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE); ?>;
+  const sortFieldLabels = <?php echo json_encode(['date'=>$sortLabels['date_value'],'name'=>$sortLabels['name_value'],'size'=>$sortLabels['size_value']], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE); ?>;
   const grid = document.getElementById('grid');
   const sortSelect = document.getElementById('photoSort');
   const sortEntries = grid ? items.map((item, index) => ({item, card: grid.children[index]})) : [];
@@ -2167,21 +2194,54 @@ button { all:unset; }
     }
     return `${new Intl.NumberFormat(document.documentElement.lang, {maximumFractionDigits:1}).format(value)} ${units[unit]}`;
   }
-  sortEntries.forEach(({item, card}) => {
-    const size = formatFileSize(item.sortSize);
-    const label = `${L('file_size')}: ${size}`;
-    const sizeBadge = card.querySelector('.photo-size');
-    if (sizeBadge) sizeBadge.textContent = label;
-    card.title = `${item.sortName} — ${label}`;
-  });
+  function updateHoverValues() {
+    const key = (sortSelect?.value || 'date-asc').split('-')[0];
+    sortEntries.forEach(({item, card}) => {
+      const value = key === 'date' ? item.sortDateLabel : key === 'name' ? item.sortName : formatFileSize(item.sortSize);
+      const label = `${sortFieldLabels[key]}: ${value}`;
+      const badge = card.querySelector('.photo-size');
+      if (badge) badge.textContent = label;
+      card.title = `${item.sortName} — ${label}`;
+    });
+  }
   if (sortSelect) {
     const sortStorageKey = `mpg_sort_${window.__CUR_DIR__ || ''}`;
     const savedSort = localStorage.getItem(sortStorageKey);
     if (Array.from(sortSelect.options).some(option => option.value === savedSort)) sortSelect.value = savedSort;
     applyPhotoSort(sortSelect.value);
+    updateHoverValues();
     sortSelect.addEventListener('change', () => {
       localStorage.setItem(sortStorageKey, sortSelect.value);
       applyPhotoSort(sortSelect.value);
+      updateHoverValues();
+    });
+  } else updateHoverValues();
+
+  const folderSortSelect = document.getElementById('folderSort');
+  if (folders && folderSortSelect) {
+    const folderCards = Array.from(folders.querySelectorAll('a.card'));
+    const folderSortStorageKey = `mpg_folder_sort_${window.__CUR_DIR__ || ''}`;
+    function applyFolderSort(value) {
+      const [key, direction] = value.split('-');
+      const multiplier = direction === 'desc' ? -1 : 1;
+      const sorted = folderCards.slice().sort((a, b) => {
+        let difference;
+        if (key === 'count') difference = Number(a.dataset.imgs) - Number(b.dataset.imgs);
+        else if (key === 'size') difference = Number(a.dataset.size) - Number(b.dataset.size);
+        else difference = a.dataset.name.localeCompare(b.dataset.name, undefined, {numeric:true, sensitivity:'base'});
+        if (difference === 0 && key !== 'name') {
+          return a.dataset.name.localeCompare(b.dataset.name, undefined, {numeric:true, sensitivity:'base'});
+        }
+        return difference * multiplier;
+      });
+      sorted.forEach(card => folders.appendChild(card));
+    }
+    const savedFolderSort = localStorage.getItem(folderSortStorageKey);
+    if (Array.from(folderSortSelect.options).some(option => option.value === savedFolderSort)) folderSortSelect.value = savedFolderSort;
+    applyFolderSort(folderSortSelect.value);
+    folderSortSelect.addEventListener('change', () => {
+      localStorage.setItem(folderSortStorageKey, folderSortSelect.value);
+      applyFolderSort(folderSortSelect.value);
     });
   }
 
