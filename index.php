@@ -197,7 +197,21 @@ function t(string $key, array $params = []): string {
 }
 
 // === SESSIONE E AUTENTICAZIONE SEMPLICE ===
-if (session_status() !== PHP_SESSION_ACTIVE) { @session_start(); }
+if (session_status() !== PHP_SESSION_ACTIVE) {
+    // SECURITY: Harden session cookie flags to protect against XSS session theft and CSRF
+    $isSecure = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+        || (($_SERVER['SERVER_PORT'] ?? null) == 443)
+        || ((isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https'));
+    session_set_cookie_params([
+        'lifetime' => 0,
+        'path'     => '/',
+        'domain'   => '',
+        'secure'   => $isSecure,
+        'httponly' => true,
+        'samesite' => 'Lax'
+    ]);
+    @session_start();
+}
 if (empty($_SESSION['csrf'])) {
     try { $_SESSION['csrf'] = bin2hex(random_bytes(16)); }
     catch (Throwable $e) { $_SESSION['csrf'] = bin2hex(openssl_random_pseudo_bytes(16)); }
@@ -206,6 +220,9 @@ $CSRF_TOKEN = $_SESSION['csrf'];
 $SESSION_KEY = 'mpg_auth';
 if (isset($_GET['logout'])) {
     unset($_SESSION[$SESSION_KEY]);
+    if (session_status() === PHP_SESSION_ACTIVE) {
+        @session_regenerate_id(true);
+    }
     header('Location: ' . $self); exit;
 }
 function auth_ok() {
@@ -226,6 +243,8 @@ function try_login($pass) {
         $ok = hash_equals($stored, $pass);
     }
     if ($ok) {
+        // SECURITY: Regenerate session ID upon privilege elevation to prevent session fixation attacks
+        @session_regenerate_id(true);
         $_SESSION[$SESSION_KEY] = 1;
         return true;
     }
