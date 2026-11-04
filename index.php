@@ -267,6 +267,21 @@ function is_image_ext($path){
     $ext = strtolower(pathinfo($path, PATHINFO_EXTENSION));
     return in_array($ext, $GLOBALS['imgExt'], true);
 }
+function image_sort_timestamp(string $path): int {
+    $mtime = @filemtime($path);
+    $fallback = $mtime === false ? 0 : $mtime;
+    if (!function_exists('exif_read_data')) return $fallback;
+
+    $exif = @exif_read_data($path, null, true, false);
+    if (!is_array($exif)) return $fallback;
+    foreach ([['EXIF','DateTimeOriginal'],['EXIF','DateTimeDigitized'],['IFD0','DateTime']] as [$section, $key]) {
+        $value = $exif[$section][$key] ?? null;
+        if (!is_string($value)) continue;
+        $date = DateTimeImmutable::createFromFormat('!Y:m:d H:i:s', substr(trim($value), 0, 19));
+        if ($date !== false) return $date->getTimestamp();
+    }
+    return $fallback;
+}
 // Lista solo le immagini supportate nella cartella (primo livello), ordinandole in modo naturale
 function list_images($dirAbs){
     $out = [];
@@ -1561,13 +1576,20 @@ foreach ($files as $path) {
     $hasThumb = isset($existingThumbs[$tName]);
     $items[] = [
         'name'     => htmlspecialchars($name, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'),
+        'sortName' => $name,
+        'sortDate' => image_sort_timestamp($path),
+        'sortSize' => (int)(@filesize($path) ?: 0),
         'src'      => htmlspecialchars(rel($path), ENT_QUOTES),
         'thumb'    => htmlspecialchars(rel($thumbPath), ENT_QUOTES),
         'hasThumb' => $hasThumb ? 1 : 0
     ];
 }
+usort($items, fn($a, $b) => ($a['sortDate'] <=> $b['sortDate']) ?: strnatcasecmp($a['sortName'], $b['sortName']));
 
 $pageTitle = $isRoot ? $cfg['title'] : basename($relDir);
+$sortLabels = $LANG === 'it'
+    ? ['sort'=>'Ordina foto','date-asc'=>'Data (meno recenti)','date-desc'=>'Data (più recenti)','name-asc'=>'Nome (A-Z)','name-desc'=>'Nome (Z-A)','size-asc'=>'Dimensione (minore)','size-desc'=>'Dimensione (maggiore)']
+    : ['sort'=>'Sort photos','date-asc'=>'Date (oldest first)','date-desc'=>'Date (newest first)','name-asc'=>'Name (A-Z)','name-desc'=>'Name (Z-A)','size-asc'=>'Size (smallest first)','size-desc'=>'Size (largest first)'];
 ?>
 <!doctype html>
 <html lang="<?php echo htmlspecialchars($LANG,ENT_QUOTES); ?>">
@@ -1640,6 +1662,18 @@ header { padding: 12px 16px; font-weight: 600; }
   /*grid-template-columns: repeat(auto-fill, minmax(var(--thumb-size), 1fr));*/
   grid-template-columns: repeat(auto-fill, minmax(calc(var(--thumb-size) * 1), 1fr));
 }
+.photo-heading {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  margin:6px 0 0;
+  padding:0 var(--gap);
+  font-size:14px;
+}
+.photo-heading h3 { margin:0; font-size:inherit; font-weight:600; }
+.photo-heading label { display:flex; align-items:center; gap:6px; font-size:12px; }
+.photo-heading select { max-width:min(220px, 55vw); }
 /* Mobile: smaller thumbnails to fit more per screen */
 @media (max-width: 720px){
   .grid{
@@ -2015,7 +2049,16 @@ button { all:unset; }
 <?php if (empty($items) && empty($subdirs)): ?>
 <p style="padding:16px"><?php echo htmlspecialchars(t('no_images'),ENT_QUOTES); ?></p>
 <?php elseif (!empty($items)): ?>
-<h3 style="margin:6px 0 0 0; padding:0 var(--gap); font-size:14px; font-weight:600;"><?php echo htmlspecialchars(t('photos'),ENT_QUOTES); ?><?php if (count($items)>0) echo ' ('.count($items).')'; ?></h3>
+<div class="photo-heading">
+  <h3><?php echo htmlspecialchars(t('photos'),ENT_QUOTES); ?> (<?php echo count($items); ?>)</h3>
+  <label for="photoSort"><?php echo htmlspecialchars($sortLabels['sort'],ENT_QUOTES); ?>
+    <select id="photoSort">
+      <?php foreach (['date-asc','date-desc','name-asc','name-desc','size-asc','size-desc'] as $sortOption): ?>
+        <option value="<?php echo htmlspecialchars($sortOption,ENT_QUOTES); ?>"><?php echo htmlspecialchars($sortLabels[$sortOption],ENT_QUOTES); ?></option>
+      <?php endforeach; ?>
+    </select>
+  </label>
+</div>
 <main class="grid" id="grid">
 <?php foreach ($items as $idx => $it): ?>
   <figure class="card" data-idx="<?php echo $idx; ?>" tabindex="0" role="button" aria-label="<?php echo htmlspecialchars($it['name'], ENT_QUOTES, 'UTF-8'); ?>">
@@ -2066,8 +2109,10 @@ button { all:unset; }
   const L = (k, p) => { let s = I18N[k] || k; if (p) for (const n in p) s = s.split('{' + n + '}').join(String(p[n])); return s; };
   const syncSummary = (s) => L('sync_sum', { v: s.visited||0, c: s.created_thumbs||0, r: s.regen_thumbs||0, x: s.removed_thumbs||0, g: s.regen_gifs||0, y: s.removed_gifs||0 });
   window.__L__ = L; window.__syncSummary__ = syncSummary;
-  const items = <?php echo json_encode($items, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE); ?>;
+  const items = <?php echo json_encode($items, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE); ?>;
   const grid = document.getElementById('grid');
+  const sortSelect = document.getElementById('photoSort');
+  const sortEntries = grid ? items.map((item, index) => ({item, card: grid.children[index]})) : [];
   const lb = document.getElementById('lightbox');
   const spinner = document.getElementById('spinner');
   const lbImg = document.getElementById('lbImg');
@@ -2077,6 +2122,37 @@ button { all:unset; }
   const btnNext = document.getElementById('btnNext');
   const folders = document.getElementById('folders');
   let idx = -1;
+
+  function applyPhotoSort(value) {
+    if (!grid || !sortSelect) return;
+    const [key, direction] = value.split('-');
+    const multiplier = direction === 'desc' ? -1 : 1;
+    const compareNames = (a, b) => a.item.sortName.localeCompare(b.item.sortName, undefined, {numeric:true, sensitivity:'base'});
+    const sorted = sortEntries.slice().sort((a, b) => {
+      const difference = key === 'date'
+        ? a.item.sortDate - b.item.sortDate
+        : key === 'size'
+          ? a.item.sortSize - b.item.sortSize
+          : compareNames(a, b);
+      return difference === 0 ? compareNames(a, b) : difference * multiplier;
+    });
+    items.length = 0;
+    sorted.forEach((entry, index) => {
+      items.push(entry.item);
+      entry.card.dataset.idx = index;
+      grid.appendChild(entry.card);
+    });
+  }
+  if (sortSelect) {
+    const sortStorageKey = `mpg_sort_${window.__CUR_DIR__ || ''}`;
+    const savedSort = localStorage.getItem(sortStorageKey);
+    if (Array.from(sortSelect.options).some(option => option.value === savedSort)) sortSelect.value = savedSort;
+    applyPhotoSort(sortSelect.value);
+    sortSelect.addEventListener('change', () => {
+      localStorage.setItem(sortStorageKey, sortSelect.value);
+      applyPhotoSort(sortSelect.value);
+    });
+  }
 
   // Dropdown menu
   const menu = document.getElementById('userMenu');
