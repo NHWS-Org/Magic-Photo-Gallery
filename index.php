@@ -200,11 +200,14 @@ function t(string $key, array $params = []): string {
 // SECURITY: Enforce cookie-only sessions with HttpOnly, SameSite, and conditional Secure flags
 if (session_status() !== PHP_SESSION_ACTIVE) {
     @ini_set('session.use_only_cookies', '1');
-    $isHttps = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || (isset($_SERVER['SERVER_PORT']) && $_SERVER['SERVER_PORT'] == 443);
+    $isSecure = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+        || (($_SERVER['SERVER_PORT'] ?? null) == 443)
+        || ((isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https'));
     session_set_cookie_params([
         'lifetime' => 0,
         'path'     => '/',
-        'secure'   => $isHttps,
+        'domain'   => '',
+        'secure'   => $isSecure,
         'httponly' => true,
         'samesite' => 'Lax'
     ]);
@@ -218,6 +221,9 @@ $CSRF_TOKEN = $_SESSION['csrf'];
 $SESSION_KEY = 'mpg_auth';
 if (isset($_GET['logout'])) {
     unset($_SESSION[$SESSION_KEY]);
+    if (session_status() === PHP_SESSION_ACTIVE) {
+        @session_regenerate_id(true);
+    }
     header('Location: ' . $self); exit;
 }
 function auth_ok() {
@@ -239,7 +245,7 @@ function try_login($pass) {
     }
     if ($ok) {
         // SECURITY: Regenerate session ID and CSRF token on privilege escalation to prevent session fixation attacks
-        session_regenerate_id(true);
+        @session_regenerate_id(true);
         try { $_SESSION['csrf'] = bin2hex(random_bytes(16)); } catch (Throwable $e) {}
         $_SESSION[$SESSION_KEY] = 1;
         return true;
@@ -1538,10 +1544,14 @@ $files = list_images($currentAbs);
 
 // === PREPARA DATI ===
 $items = [];
+// Performance optimization (Bolt ⚡): Read existing thumbnails once into an associative lookup map.
+// Replaces N file_exists() filesystem stat calls with O(1) hash lookups, speeding up gallery rendering on large albums.
+$existingThumbs = is_dir($thumbDirForView) ? array_flip(scandir($thumbDirForView) ?: []) : [];
 foreach ($files as $path) {
     $name = basename($path);
-    $thumbPath = $thumbDirForView . '/' . thumb_name($name);
-    $hasThumb = file_exists($thumbPath);
+    $tName = thumb_name($name);
+    $thumbPath = $thumbDirForView . '/' . $tName;
+    $hasThumb = isset($existingThumbs[$tName]);
     $items[] = [
         'name'     => htmlspecialchars($name, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'),
         'src'      => htmlspecialchars(rel($path), ENT_QUOTES),
