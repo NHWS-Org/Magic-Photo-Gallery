@@ -197,8 +197,9 @@ function t(string $key, array $params = []): string {
 }
 
 // === SESSIONE E AUTENTICAZIONE SEMPLICE ===
+// SECURITY: Enforce cookie-only sessions with HttpOnly, SameSite, and conditional Secure flags
 if (session_status() !== PHP_SESSION_ACTIVE) {
-    // SECURITY: Harden session cookie flags to protect against XSS session theft and CSRF
+    @ini_set('session.use_only_cookies', '1');
     $isSecure = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
         || (($_SERVER['SERVER_PORT'] ?? null) == 443)
         || ((isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https'));
@@ -243,8 +244,9 @@ function try_login($pass) {
         $ok = hash_equals($stored, $pass);
     }
     if ($ok) {
-        // SECURITY: Regenerate session ID upon privilege elevation to prevent session fixation attacks
+        // SECURITY: Regenerate session ID and CSRF token on privilege escalation to prevent session fixation attacks
         @session_regenerate_id(true);
+        try { $_SESSION['csrf'] = bin2hex(random_bytes(16)); } catch (Throwable $e) {}
         $_SESSION[$SESSION_KEY] = 1;
         return true;
     }
