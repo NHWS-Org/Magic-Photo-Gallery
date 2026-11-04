@@ -197,7 +197,19 @@ function t(string $key, array $params = []): string {
 }
 
 // === SESSIONE E AUTENTICAZIONE SEMPLICE ===
-if (session_status() !== PHP_SESSION_ACTIVE) { @session_start(); }
+// SECURITY: Enforce cookie-only sessions with HttpOnly, SameSite, and conditional Secure flags
+if (session_status() !== PHP_SESSION_ACTIVE) {
+    @ini_set('session.use_only_cookies', '1');
+    $isHttps = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || (isset($_SERVER['SERVER_PORT']) && $_SERVER['SERVER_PORT'] == 443);
+    session_set_cookie_params([
+        'lifetime' => 0,
+        'path'     => '/',
+        'secure'   => $isHttps,
+        'httponly' => true,
+        'samesite' => 'Lax'
+    ]);
+    @session_start();
+}
 if (empty($_SESSION['csrf'])) {
     try { $_SESSION['csrf'] = bin2hex(random_bytes(16)); }
     catch (Throwable $e) { $_SESSION['csrf'] = bin2hex(openssl_random_pseudo_bytes(16)); }
@@ -226,6 +238,9 @@ function try_login($pass) {
         $ok = hash_equals($stored, $pass);
     }
     if ($ok) {
+        // SECURITY: Regenerate session ID and CSRF token on privilege escalation to prevent session fixation attacks
+        session_regenerate_id(true);
+        try { $_SESSION['csrf'] = bin2hex(random_bytes(16)); } catch (Throwable $e) {}
         $_SESSION[$SESSION_KEY] = 1;
         return true;
     }
