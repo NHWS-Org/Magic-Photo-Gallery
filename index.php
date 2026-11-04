@@ -1588,8 +1588,8 @@ usort($items, fn($a, $b) => ($a['sortDate'] <=> $b['sortDate']) ?: strnatcasecmp
 
 $pageTitle = $isRoot ? $cfg['title'] : basename($relDir);
 $sortLabels = $LANG === 'it'
-    ? ['sort'=>'Ordina foto','date-asc'=>'Data (meno recenti)','date-desc'=>'Data (più recenti)','name-asc'=>'Nome (A-Z)','name-desc'=>'Nome (Z-A)','size-asc'=>'Dimensione (minore)','size-desc'=>'Dimensione (maggiore)']
-    : ['sort'=>'Sort photos','date-asc'=>'Date (oldest first)','date-desc'=>'Date (newest first)','name-asc'=>'Name (A-Z)','name-desc'=>'Name (Z-A)','size-asc'=>'Size (smallest first)','size-desc'=>'Size (largest first)'];
+    ? ['sort'=>'Ordina foto','date-asc'=>'Data (meno recenti)','date-desc'=>'Data (più recenti)','name-asc'=>'Nome (A-Z)','name-desc'=>'Nome (Z-A)','size-asc'=>'Dimensione (minore)','size-desc'=>'Dimensione (maggiore)','file_size'=>'Dimensione file']
+    : ['sort'=>'Sort photos','date-asc'=>'Date (oldest first)','date-desc'=>'Date (newest first)','name-asc'=>'Name (A-Z)','name-desc'=>'Name (Z-A)','size-asc'=>'Size (smallest first)','size-desc'=>'Size (largest first)','file_size'=>'File size'];
 ?>
 <!doctype html>
 <html lang="<?php echo htmlspecialchars($LANG,ENT_QUOTES); ?>">
@@ -1750,6 +1750,16 @@ header { padding: 12px 16px; font-weight: 600; }
   text-shadow:0 1px 2px rgba(0,0,0,.85);
   white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
 }
+.photo-size{
+  position:absolute; top:8px; right:8px; z-index:2;
+  padding:4px 7px; border-radius:999px;
+  background:rgba(0,0,0,.65); color:#fff;
+  font-size:12px; line-height:1.2;
+  opacity:0; transform:translateY(-3px);
+  transition:opacity .15s ease, transform .15s ease;
+  pointer-events:none;
+}
+.card:hover .photo-size, .card:focus-visible .photo-size{ opacity:1; transform:none; }
 
 /* Folder cards: darken background and subtly blur GIF to make text stand out */
 #folders .card::after{
@@ -1822,7 +1832,10 @@ header { padding: 12px 16px; font-weight: 600; }
   outline-offset: 2px;
 }
 button { all:unset; }
-@media (hover:none){ .card:hover img{transform:none;} }
+@media (hover:none){
+  .card:hover img{transform:none;}
+  .photo-size{display:none;}
+}
 .collapsed { display:none !important; }
 
 /* --- Dropdown menu --- */
@@ -2062,6 +2075,7 @@ button { all:unset; }
 <main class="grid" id="grid">
 <?php foreach ($items as $idx => $it): ?>
   <figure class="card" data-idx="<?php echo $idx; ?>" tabindex="0" role="button" aria-label="<?php echo htmlspecialchars($it['name'], ENT_QUOTES, 'UTF-8'); ?>">
+    <div class="photo-size" aria-hidden="true"></div>
     <img
       src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw=="
       data-thumb="<?php echo $it['thumb']; ?>"
@@ -2143,6 +2157,23 @@ button { all:unset; }
       grid.appendChild(entry.card);
     });
   }
+  function formatFileSize(bytes) {
+    const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+    let value = bytes;
+    let unit = 0;
+    while (value >= 1024 && unit < units.length - 1) {
+      value /= 1024;
+      unit++;
+    }
+    return `${new Intl.NumberFormat(document.documentElement.lang, {maximumFractionDigits:1}).format(value)} ${units[unit]}`;
+  }
+  sortEntries.forEach(({item, card}) => {
+    const size = formatFileSize(item.sortSize);
+    const label = `${L('file_size')}: ${size}`;
+    const sizeBadge = card.querySelector('.photo-size');
+    if (sizeBadge) sizeBadge.textContent = label;
+    card.title = `${item.sortName} — ${label}`;
+  });
   if (sortSelect) {
     const sortStorageKey = `mpg_sort_${window.__CUR_DIR__ || ''}`;
     const savedSort = localStorage.getItem(sortStorageKey);
@@ -2343,13 +2374,15 @@ syncBtn?.addEventListener('click', (e)=>{
     lb.classList.add('open','loading');
     lb.setAttribute('aria-hidden', 'false');
     spinner.style.display = 'block';
-    const src = items[idx].src;
+    const item = items[idx];
+    const src = item.src;
     lbImg.src = '';
-    lbImg.alt = items[idx].name;
+    lbImg.alt = item.name;
     counter.textContent = (idx+1) + ' / ' + items.length;
     if (exifPanel) { exifPanel.classList.remove('open'); exifPanel.innerHTML=''; }
-    fetch(withDir(`${window.__SELF__}?exif=${encodeURIComponent(items[idx].name)}`), {cache:'no-store'})
-      .then(r=>r.json()).then(renderExif).catch(()=>renderExif(null));
+    fetch(withDir(`${window.__SELF__}?exif=${encodeURIComponent(item.name)}`), {cache:'no-store'})
+      .then(r=>r.json()).then(d=>{ if (items[idx] === item) renderExif(d, item); })
+      .catch(()=>{ if (items[idx] === item) renderExif(null, item); });
     document.body.style.overflow = 'hidden';
     const tmp = new Image();
     tmp.onload = () => {
@@ -2412,7 +2445,7 @@ syncBtn?.addEventListener('click', (e)=>{
   const btnInfo = document.getElementById('btnInfo');
   const exifPanel = document.getElementById('exifPanel');
 
-  function renderExif(d){
+  function renderExif(d, item){
     if (!exifPanel) return;
     // SECURITY: Use safe DOM methods and textContent to prevent DOM XSS from image filenames or EXIF metadata
     exifPanel.textContent = '';
@@ -2445,6 +2478,13 @@ syncBtn?.addEventListener('click', (e)=>{
         g.append(kEl, vEl);
       }
     }
+    const sizeKey = document.createElement('div');
+    sizeKey.className = 'k';
+    sizeKey.textContent = L('file_size');
+    const sizeValue = document.createElement('div');
+    sizeValue.className = 'v';
+    sizeValue.textContent = formatFileSize(item?.sortSize || 0);
+    g.append(sizeKey, sizeValue);
     exifPanel.append(h, g);
   }
   function toggleExif(){ exifPanel?.classList.toggle('open'); }
