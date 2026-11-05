@@ -1689,6 +1689,17 @@ header { padding: 12px 16px; font-weight: 600; }
   gap:12px;
 }
 .folders-heading h3 { margin:6px 0 8px; font-size:14px; font-weight:600; }
+#foldersToggle {
+  display:inline-flex;
+  align-items:center;
+  gap:4px;
+}
+#foldersToggle:hover { opacity:0.85; }
+#foldersToggle:focus-visible {
+  outline: 2px solid #2a6fef;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
 .folders-heading label { display:flex; align-items:center; gap:6px; font-size:12px; }
 .folders-heading select { max-width:min(220px, 55vw); }
 /* Mobile: smaller thumbnails to fit more per screen */
@@ -2053,7 +2064,7 @@ button { all:unset; }
 <?php if (!empty($subdirs)): ?>
 <section style="padding:0 var(--gap);">
   <div class="folders-heading">
-    <h3 id="foldersToggle" style="cursor:pointer; user-select:none;">
+    <h3 id="foldersToggle" role="button" tabindex="0" aria-expanded="true" aria-controls="folders" style="cursor:pointer; user-select:none;">
       <span id="foldersCaret" aria-hidden="true">▾</span> <?php echo htmlspecialchars(t('folders'),ENT_QUOTES); ?>
     </h3>
     <label for="folderSort"><?php echo htmlspecialchars($folderSortLabels['sort'],ENT_QUOTES); ?>
@@ -2328,15 +2339,25 @@ syncBtn?.addEventListener('click', (e)=>{
   const keyColl = `mpg_fc_${window.__CUR_DIR__ || ''}`;
   function applyFoldState(){
     const st = localStorage.getItem(keyColl) || 'open';
-    if (st==='closed'){ folders?.classList.add('collapsed'); if(caret) caret.textContent='▸'; }
+    const isClosed = st === 'closed';
+    if (isClosed){ folders?.classList.add('collapsed'); if(caret) caret.textContent='▸'; }
     else { folders?.classList.remove('collapsed'); if(caret) caret.textContent='▾'; }
+    toggle?.setAttribute('aria-expanded', isClosed ? 'false' : 'true');
+  }
+  function toggleFolders(){
+    folders?.classList.toggle('collapsed');
+    const closed = Boolean(folders && folders.classList.contains('collapsed'));
+    if (caret) caret.textContent = closed ? '▸' : '▾';
+    toggle?.setAttribute('aria-expanded', closed ? 'false' : 'true');
+    localStorage.setItem(keyColl, closed ? 'closed' : 'open');
   }
   applyFoldState();
-  toggle?.addEventListener('click', ()=>{
-    folders?.classList.toggle('collapsed');
-    const closed = folders && folders.classList.contains('collapsed');
-    if (caret) caret.textContent = closed ? '▸' : '▾';
-    localStorage.setItem(keyColl, closed ? 'closed' : 'open');
+  toggle?.addEventListener('click', toggleFolders);
+  toggle?.addEventListener('keydown', (e)=>{
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      toggleFolders();
+    }
   });
 
   // Utility per endpoint con dir
