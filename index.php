@@ -902,6 +902,8 @@ if (isset($_GET['exif'])) {
     // SECURITY: Prevent unauthorized access to photo metadata when auth_mode == 2
     if ((int)$cfg['auth_mode'] === 2 && !auth_ok()) { http_response_code(401); echo json_encode(['ok'=>false,'error'=>'unauthorized']); exit; }
     $name = basename((string)$_GET['exif']);
+    // SECURITY: Reject hidden/dotfiles and non-image extensions to prevent metadata probing or processing of arbitrary server files
+    if ($name === '' || $name[0] === '.' || !is_image_ext($name)) { http_response_code(400); echo json_encode(['ok'=>false,'error'=>'invalid_image']); exit; }
     $srcPath = $currentAbs . '/' . $name;
     if (!is_file($srcPath)) { echo json_encode(['ok'=>false,'error'=>'not_found']); exit; }
 
@@ -1101,6 +1103,8 @@ if (isset($_GET['diag'])) {
     header('Content-Type: application/json; charset=utf-8');
     if (!auth_ok()) { http_response_code(401); echo json_encode(['ok'=>false,'error'=>'unauthorized']); exit; }
     $name = basename($_GET['diag']);
+    // SECURITY: Reject hidden/dotfiles and non-image files to avoid probing server files
+    if ($name === '' || $name[0] === '.' || !is_image_ext($name)) { http_response_code(400); echo json_encode(['ok'=>false,'error'=>'invalid_image']); exit; }
     $srcPath = ($currentAbs . '/' . $name);
     $thumbPath = ($thumbDirForView . '/' . thumb_name($name));
     $out = [
@@ -1129,6 +1133,8 @@ if (isset($_GET['make_thumb'])) {
     $force = isset($_GET['force']) && $_GET['force'] === '1';
 
     $name = basename($_GET['make_thumb']); // sanitizza
+    // SECURITY: Reject hidden/dotfiles and non-image extensions to prevent processing arbitrary files or DoS
+    if ($name === '' || $name[0] === '.' || !is_image_ext($name)) { http_response_code(400); echo json_encode(['ok'=>false,'error'=>'invalid_image']); exit; }
     $srcPath = $currentAbs . '/' . $name;
     $thumbPath = $thumbDirForView . '/' . thumb_name($name);
 
