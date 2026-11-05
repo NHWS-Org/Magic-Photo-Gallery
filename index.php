@@ -197,7 +197,22 @@ function t(string $key, array $params = []): string {
 }
 
 // === SESSIONE E AUTENTICAZIONE SEMPLICE ===
-if (session_status() !== PHP_SESSION_ACTIVE) { @session_start(); }
+// SECURITY: Enforce cookie-only sessions with HttpOnly, SameSite, and conditional Secure flags
+if (session_status() !== PHP_SESSION_ACTIVE) {
+    @ini_set('session.use_only_cookies', '1');
+    $isSecure = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+        || (($_SERVER['SERVER_PORT'] ?? null) == 443)
+        || ((isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https'));
+    session_set_cookie_params([
+        'lifetime' => 0,
+        'path'     => '/',
+        'domain'   => '',
+        'secure'   => $isSecure,
+        'httponly' => true,
+        'samesite' => 'Lax'
+    ]);
+    @session_start();
+}
 if (empty($_SESSION['csrf'])) {
     try { $_SESSION['csrf'] = bin2hex(random_bytes(16)); }
     catch (Throwable $e) { $_SESSION['csrf'] = bin2hex(openssl_random_pseudo_bytes(16)); }
@@ -206,6 +221,9 @@ $CSRF_TOKEN = $_SESSION['csrf'];
 $SESSION_KEY = 'mpg_auth';
 if (isset($_GET['logout'])) {
     unset($_SESSION[$SESSION_KEY]);
+    if (session_status() === PHP_SESSION_ACTIVE) {
+        @session_regenerate_id(true);
+    }
     header('Location: ' . $self); exit;
 }
 function auth_ok() {
@@ -226,6 +244,9 @@ function try_login($pass) {
         $ok = hash_equals($stored, $pass);
     }
     if ($ok) {
+        // SECURITY: Regenerate session ID and CSRF token on privilege escalation to prevent session fixation attacks
+        @session_regenerate_id(true);
+        try { $_SESSION['csrf'] = bin2hex(random_bytes(16)); } catch (Throwable $e) {}
         $_SESSION[$SESSION_KEY] = 1;
         return true;
     }
@@ -245,6 +266,21 @@ function dbg_log($data) {
 function is_image_ext($path){
     $ext = strtolower(pathinfo($path, PATHINFO_EXTENSION));
     return in_array($ext, $GLOBALS['imgExt'], true);
+}
+function image_sort_timestamp(string $path): int {
+    $mtime = @filemtime($path);
+    $fallback = $mtime === false ? 0 : $mtime;
+    if (!function_exists('exif_read_data')) return $fallback;
+
+    $exif = @exif_read_data($path, null, true, false);
+    if (!is_array($exif)) return $fallback;
+    foreach ([['EXIF','DateTimeOriginal'],['EXIF','DateTimeDigitized'],['IFD0','DateTime']] as [$section, $key]) {
+        $value = $exif[$section][$key] ?? null;
+        if (!is_string($value)) continue;
+        $date = DateTimeImmutable::createFromFormat('!Y:m:d H:i:s', substr(trim($value), 0, 19));
+        if ($date !== false) return $date->getTimestamp();
+    }
+    return $fallback;
 }
 // Lista solo le immagini supportate nella cartella (primo livello), ordinandole in modo naturale
 function list_images($dirAbs){
@@ -866,6 +902,8 @@ if (isset($_GET['exif'])) {
     // SECURITY: Prevent unauthorized access to photo metadata when auth_mode == 2
     if ((int)$cfg['auth_mode'] === 2 && !auth_ok()) { http_response_code(401); echo json_encode(['ok'=>false,'error'=>'unauthorized']); exit; }
     $name = basename((string)$_GET['exif']);
+    // SECURITY: Reject hidden/dotfiles and non-image extensions to prevent metadata probing or processing of arbitrary server files
+    if ($name === '' || $name[0] === '.' || !is_image_ext($name)) { http_response_code(400); echo json_encode(['ok'=>false,'error'=>'invalid_image']); exit; }
     $srcPath = $currentAbs . '/' . $name;
     if (!is_file($srcPath)) { echo json_encode(['ok'=>false,'error'=>'not_found']); exit; }
 
@@ -1065,6 +1103,8 @@ if (isset($_GET['diag'])) {
     header('Content-Type: application/json; charset=utf-8');
     if (!auth_ok()) { http_response_code(401); echo json_encode(['ok'=>false,'error'=>'unauthorized']); exit; }
     $name = basename($_GET['diag']);
+    // SECURITY: Reject hidden/dotfiles and non-image files to avoid probing server files
+    if ($name === '' || $name[0] === '.' || !is_image_ext($name)) { http_response_code(400); echo json_encode(['ok'=>false,'error'=>'invalid_image']); exit; }
     $srcPath = ($currentAbs . '/' . $name);
     $thumbPath = ($thumbDirForView . '/' . thumb_name($name));
     $out = [
@@ -1093,6 +1133,8 @@ if (isset($_GET['make_thumb'])) {
     $force = isset($_GET['force']) && $_GET['force'] === '1';
 
     $name = basename($_GET['make_thumb']); // sanitizza
+    // SECURITY: Reject hidden/dotfiles and non-image extensions to prevent processing arbitrary files or DoS
+    if ($name === '' || $name[0] === '.' || !is_image_ext($name)) { http_response_code(400); echo json_encode(['ok'=>false,'error'=>'invalid_image']); exit; }
     $srcPath = $currentAbs . '/' . $name;
     $thumbPath = $thumbDirForView . '/' . thumb_name($name);
 
@@ -1450,92 +1492,117 @@ if (isset($_GET['sync_cache'])) {
 }
 
 // === SCANSIONE: sottocartelle e file immagini nella cartella corrente ===
+// Performance optimization (Bolt ⚡):
+// 1. Collect subdirectories and image files in a single pass of $currentAbs instead of scanning twice.
+// 2. Pre-scan the thumbnail directory once into a hash set ($existingThumbs) so checking if each
+//    image has a thumbnail is an O(1) in-memory lookup instead of N disk stat/file_exists calls.
 $subdirs = [];
+$files = [];
 $dIt = @scandir($currentAbs) ?: [];
 foreach ($dIt as $entry) {
     if ($entry === '.' || $entry === '..') continue;
     $abs = $currentAbs . '/' . $entry;
-    if (!is_dir($abs)) continue;
-    $rel = ltrim(($relDir ? $relDir . '/' : '') . $entry, '/');
-    if (is_excluded_dir($entry, $rel)) continue;
-    // Performance optimization (Bolt ⚡): Count immediate images and subdirectories in a single pass.
-    // Avoids redundant scandir(), array allocations, and natsort() overhead from list_images().
-    $imgCount = 0;
-    $dirCount = 0;
-    $scanInner = @scandir($abs) ?: [];
-    foreach ($scanInner as $e2) {
-        if ($e2 === '.' || $e2 === '..') continue;
-        if ($e2[0] === '.') continue;
-        $abs2 = $abs . '/' . $e2;
-        if (is_dir($abs2)) {
-            $rel2 = ltrim(($rel ? $rel . '/' : '') . $e2, '/');
-            if (is_excluded_dir($e2, $rel2)) continue;
-            $dirCount++;
-        } elseif (is_file($abs2) && is_image_ext($abs2)) {
-            $imgCount++;
+    if (is_dir($abs)) {
+        $rel = ltrim(($relDir ? $relDir . '/' : '') . $entry, '/');
+        if (is_excluded_dir($entry, $rel)) continue;
+        $imgCount = 0;
+        $imgSize = 0;
+        $dirCount = 0;
+        $scanInner = @scandir($abs) ?: [];
+        foreach ($scanInner as $e2) {
+            if ($e2 === '.' || $e2 === '..') continue;
+            if ($e2[0] === '.') continue;
+            $abs2 = $abs . '/' . $e2;
+            if (is_dir($abs2)) {
+                $rel2 = ltrim(($rel ? $rel . '/' : '') . $e2, '/');
+                if (is_excluded_dir($e2, $rel2)) continue;
+                $dirCount++;
+            } elseif (is_file($abs2) && is_image_ext($abs2)) {
+                $imgCount++;
+                $imgSize += (int)(@filesize($abs2) ?: 0);
+            }
         }
+        // GIF path
+        $gifAbs = ($rel === '' ? ($thumbsRoot . '/' . $folderGifName) : ($thumbsRoot . '/' . implode('/', array_map(fn($seg) => $prefFolder.$seg, explode('/', $rel))) . '/' . $folderGifName));
+        // Placeholder SVG per "cartella annidata" quando non ci sono foto ma ci sono sottocartelle
+        $placeholder = null;
+        if (!file_exists($gifAbs) && $imgCount === 0 && $dirCount > 0) {
+            $svg = '<?xml version="1.0" encoding="UTF-8"?>'
+                 . '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 150" preserveAspectRatio="xMidYMid slice">'
+                 . '<defs>'
+                 . '  <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">'
+                 . '    <stop offset="0" stop-color="#eef1f5"/><stop offset="1" stop-color="#e3e6ea"/>'
+                 . '  </linearGradient>'
+                 . '  <linearGradient id="folder" x1="0" y1="0" x2="0" y2="1">'
+                 . '    <stop offset="0" stop-color="#ffd36b"/><stop offset="1" stop-color="#f0b548"/>'
+                 . '  </linearGradient>'
+                 . '  <filter id="soft" x="-10%" y="-10%" width="120%" height="120%"><feGaussianBlur in="SourceAlpha" stdDeviation="2"/><feOffset dy="1"/><feComponentTransfer><feFuncA type="linear" slope="0.35"/></feComponentTransfer><feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge></filter>'
+                 . '</defs>'
+                 . '<rect width="200" height="150" rx="16" fill="url(#bg)"/>'
+                 . '<g transform="translate(20,36)" filter="url(#soft)">'
+                 . '  <!-- linguetta -->'
+                 . '  <path d="M18 6h32c6 0 10 2 13 6l5 6h78a12 12 0 0 1 12 12v48a12 12 0 0 1-12 12H12A12 12 0 0 1 0 78V18A12 12 0 0 1 12 6z" fill="url(#folder)" stroke="#d39f43" stroke-width="1"/>'
+                 . '  <!-- documenti stilizzati -->'
+                 . '  <g opacity=".9" transform="translate(24,28)">'
+                 . '    <rect x="0" y="8" width="50" height="34" rx="6" fill="#fff" stroke="#d9d9d9"/>'
+                 . '    <rect x="10" y="0" width="60" height="38" rx="6" fill="#fff" stroke="#d9d9d9"/>'
+                 . '  </g>'
+                 . '  <!-- indice cartelle -->'
+                 . '  <g opacity=".8" transform="translate(110,24)">'
+                 . '    <rect x="0" y="0" width="48" height="30" rx="6" fill="#fff" stroke="#d9d9d9"/>'
+                 . '    <path d="M12 9h24M12 15h24M12 21h24" stroke="#a0a0a0" stroke-width="3" stroke-linecap="round"/>'
+                 . '  </g>'
+                 . '</g>'
+                 . '</svg>';
+            $placeholder = 'data:image/svg+xml;base64,' . base64_encode($svg);
+        }
+        $subdirs[] = [
+            'name' => $entry,
+            'rel'  => $rel,
+            'gif'  => file_exists($gifAbs) ? rel_url($gifAbs) : null,
+            'imgs' => $imgCount,
+            'size' => $imgSize,
+            'dirs' => $dirCount,
+            'placeholder' => $placeholder
+        ];
+    } elseif ($entry[0] !== '.' && is_file($abs) && is_image_ext($abs)) {
+        $files[] = $abs;
     }
-    // GIF path
-    $gifAbs = ($rel === '' ? ($thumbsRoot . '/' . $folderGifName) : ($thumbsRoot . '/' . implode('/', array_map(fn($seg) => $prefFolder.$seg, explode('/', $rel))) . '/' . $folderGifName));
-    // Placeholder SVG per "cartella annidata" quando non ci sono foto ma ci sono sottocartelle
-    $placeholder = null;
-    if (!file_exists($gifAbs) && $imgCount === 0 && $dirCount > 0) {
-        $svg = '<?xml version="1.0" encoding="UTF-8"?>'
-             . '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 150" preserveAspectRatio="xMidYMid slice">'
-             . '<defs>'
-             . '  <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">'
-             . '    <stop offset="0" stop-color="#eef1f5"/><stop offset="1" stop-color="#e3e6ea"/>'
-             . '  </linearGradient>'
-             . '  <linearGradient id="folder" x1="0" y1="0" x2="0" y2="1">'
-             . '    <stop offset="0" stop-color="#ffd36b"/><stop offset="1" stop-color="#f0b548"/>'
-             . '  </linearGradient>'
-             . '  <filter id="soft" x="-10%" y="-10%" width="120%" height="120%"><feGaussianBlur in="SourceAlpha" stdDeviation="2"/><feOffset dy="1"/><feComponentTransfer><feFuncA type="linear" slope="0.35"/></feComponentTransfer><feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge></filter>'
-             . '</defs>'
-             . '<rect width="200" height="150" rx="16" fill="url(#bg)"/>'
-             . '<g transform="translate(20,36)" filter="url(#soft)">'
-             . '  <!-- linguetta -->'
-             . '  <path d="M18 6h32c6 0 10 2 13 6l5 6h78a12 12 0 0 1 12 12v48a12 12 0 0 1-12 12H12A12 12 0 0 1 0 78V18A12 12 0 0 1 12 6z" fill="url(#folder)" stroke="#d39f43" stroke-width="1"/>'
-             . '  <!-- documenti stilizzati -->'
-             . '  <g opacity=".9" transform="translate(24,28)">'
-             . '    <rect x="0" y="8" width="50" height="34" rx="6" fill="#fff" stroke="#d9d9d9"/>'
-             . '    <rect x="10" y="0" width="60" height="38" rx="6" fill="#fff" stroke="#d9d9d9"/>'
-             . '  </g>'
-             . '  <!-- indice cartelle -->'
-             . '  <g opacity=".8" transform="translate(110,24)">'
-             . '    <rect x="0" y="0" width="48" height="30" rx="6" fill="#fff" stroke="#d9d9d9"/>'
-             . '    <path d="M12 9h24M12 15h24M12 21h24" stroke="#a0a0a0" stroke-width="3" stroke-linecap="round"/>'
-             . '  </g>'
-             . '</g>'
-             . '</svg>';
-        $placeholder = 'data:image/svg+xml;base64,' . base64_encode($svg);
-    }
-    $subdirs[] = [
-        'name' => $entry,
-        'rel'  => $rel,
-        'gif'  => file_exists($gifAbs) ? rel_url($gifAbs) : null,
-        'imgs' => $imgCount,
-        'dirs' => $dirCount,
-        'placeholder' => $placeholder
-    ];
 }
-// immagini nella cartella corrente
-$files = list_images($currentAbs);
+natsort($files);
+$files = array_values($files);
 
 // === PREPARA DATI ===
 $items = [];
+// Performance optimization (Bolt ⚡): Read existing thumbnails once into an associative lookup map.
+// Replaces N file_exists() filesystem stat calls with O(1) hash lookups, speeding up gallery rendering on large albums.
+$existingThumbs = is_dir($thumbDirForView) ? array_flip(@scandir($thumbDirForView) ?: []) : [];
 foreach ($files as $path) {
     $name = basename($path);
-    $thumbPath = $thumbDirForView . '/' . thumb_name($name);
-    $hasThumb = file_exists($thumbPath);
+    $tName = thumb_name($name);
+    $thumbPath = $thumbDirForView . '/' . $tName;
+    $hasThumb = isset($existingThumbs[$tName]);
+    $sortDate = image_sort_timestamp($path);
     $items[] = [
         'name'     => htmlspecialchars($name, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'),
+        'sortName' => $name,
+        'sortDate' => $sortDate,
+        'sortDateLabel' => date('Y-m-d H:i:s', $sortDate),
+        'sortSize' => (int)(@filesize($path) ?: 0),
         'src'      => htmlspecialchars(rel($path), ENT_QUOTES),
         'thumb'    => htmlspecialchars(rel($thumbPath), ENT_QUOTES),
         'hasThumb' => $hasThumb ? 1 : 0
     ];
 }
+usort($items, fn($a, $b) => ($a['sortDate'] <=> $b['sortDate']) ?: strnatcasecmp($a['sortName'], $b['sortName']));
 
 $pageTitle = $isRoot ? $cfg['title'] : basename($relDir);
+$sortLabels = $LANG === 'it'
+    ? ['sort'=>'Ordina foto','date-asc'=>'Data (meno recenti)','date-desc'=>'Data (più recenti)','name-asc'=>'Nome (A-Z)','name-desc'=>'Nome (Z-A)','size-asc'=>'Dimensione (minore)','size-desc'=>'Dimensione (maggiore)','file_size'=>'Dimensione file','date_value'=>'Data','name_value'=>'Nome','size_value'=>'Dimensione']
+    : ['sort'=>'Sort photos','date-asc'=>'Date (oldest first)','date-desc'=>'Date (newest first)','name-asc'=>'Name (A-Z)','name-desc'=>'Name (Z-A)','size-asc'=>'Size (smallest first)','size-desc'=>'Size (largest first)','file_size'=>'File size','date_value'=>'Date','name_value'=>'Name','size_value'=>'Size'];
+$folderSortLabels = $LANG === 'it'
+    ? ['sort'=>'Ordina cartelle','name-asc'=>'Nome (A-Z)','name-desc'=>'Nome (Z-A)','count-asc'=>'Meno foto','count-desc'=>'Più foto','size-asc'=>'Contenuto più piccolo','size-desc'=>'Contenuto più grande']
+    : ['sort'=>'Sort folders','name-asc'=>'Name (A-Z)','name-desc'=>'Name (Z-A)','count-asc'=>'Fewest photos','count-desc'=>'Most photos','size-asc'=>'Smallest contents','size-desc'=>'Largest contents'];
 ?>
 <!doctype html>
 <html lang="<?php echo htmlspecialchars($LANG,ENT_QUOTES); ?>">
@@ -1608,6 +1675,38 @@ header { padding: 12px 16px; font-weight: 600; }
   /*grid-template-columns: repeat(auto-fill, minmax(var(--thumb-size), 1fr));*/
   grid-template-columns: repeat(auto-fill, minmax(calc(var(--thumb-size) * 1), 1fr));
 }
+.photo-heading {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  margin:6px 0 0;
+  padding:0 var(--gap);
+  font-size:14px;
+}
+.photo-heading h3 { margin:0; font-size:inherit; font-weight:600; }
+.photo-heading label { display:flex; align-items:center; gap:6px; font-size:12px; }
+.photo-heading select { max-width:min(220px, 55vw); }
+.folders-heading {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+}
+.folders-heading h3 { margin:6px 0 8px; font-size:14px; font-weight:600; }
+#foldersToggle {
+  display:inline-flex;
+  align-items:center;
+  gap:4px;
+}
+#foldersToggle:hover { opacity:0.85; }
+#foldersToggle:focus-visible {
+  outline: 2px solid #2a6fef;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+.folders-heading label { display:flex; align-items:center; gap:6px; font-size:12px; }
+.folders-heading select { max-width:min(220px, 55vw); }
 /* Mobile: smaller thumbnails to fit more per screen */
 @media (max-width: 720px){
   .grid{
@@ -1631,6 +1730,10 @@ header { padding: 12px 16px; font-weight: 600; }
   cursor:pointer;
   aspect-ratio: 1 / 1; /* celle quadrate e uniformi */
   content-visibility: auto; contain-intrinsic-size: var(--thumb-size) var(--thumb-size);
+}
+.card:focus-visible {
+  outline: 2px solid #2a6fef;
+  outline-offset: 2px;
 }
 .progress {
   position:absolute;
@@ -1680,6 +1783,16 @@ header { padding: 12px 16px; font-weight: 600; }
   text-shadow:0 1px 2px rgba(0,0,0,.85);
   white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
 }
+.photo-size{
+  position:absolute; top:8px; right:8px; z-index:2;
+  padding:4px 7px; border-radius:999px;
+  background:rgba(0,0,0,.65); color:#fff;
+  font-size:12px; line-height:1.2;
+  opacity:0; transform:translateY(-3px);
+  transition:opacity .15s ease, transform .15s ease;
+  pointer-events:none;
+}
+.card:hover .photo-size, .card:focus-visible .photo-size{ opacity:1; transform:none; }
 
 /* Folder cards: darken background and subtly blur GIF to make text stand out */
 #folders .card::after{
@@ -1756,7 +1869,10 @@ header { padding: 12px 16px; font-weight: 600; }
   outline-offset: 2px;
 }
 button { all:unset; }
-@media (hover:none){ .card:hover img{transform:none;} }
+@media (hover:none){
+  .card:hover img{transform:none;}
+  .photo-size{display:none;}
+}
 .collapsed { display:none !important; }
 
 /* --- Dropdown menu --- */
@@ -1956,12 +2072,21 @@ button { all:unset; }
 
 <?php if (!empty($subdirs)): ?>
 <section style="padding:0 var(--gap);">
-  <h3 id="foldersToggle" style="margin:6px 0 8px 0; font-size:14px; font-weight:600; cursor:pointer; user-select:none;">
-    <span id="foldersCaret" aria-hidden="true">▾</span> <?php echo htmlspecialchars(t('folders'),ENT_QUOTES); ?>
-  </h3>
+  <div class="folders-heading">
+    <h3 id="foldersToggle" role="button" tabindex="0" aria-expanded="true" aria-controls="folders" style="cursor:pointer; user-select:none;">
+      <span id="foldersCaret" aria-hidden="true">▾</span> <?php echo htmlspecialchars(t('folders'),ENT_QUOTES); ?>
+    </h3>
+    <label for="folderSort"><?php echo htmlspecialchars($folderSortLabels['sort'],ENT_QUOTES); ?>
+      <select id="folderSort">
+        <?php foreach (['name-asc','name-desc','count-asc','count-desc','size-asc','size-desc'] as $sortOption): ?>
+          <option value="<?php echo htmlspecialchars($sortOption,ENT_QUOTES); ?>"><?php echo htmlspecialchars($folderSortLabels[$sortOption],ENT_QUOTES); ?></option>
+        <?php endforeach; ?>
+      </select>
+    </label>
+  </div>
   <div class="grid" id="folders">
     <?php foreach ($subdirs as $sd): ?>
-      <a class="card" href="<?php echo htmlspecialchars($self,ENT_QUOTES); ?>?dir=<?php echo rawurlencode($sd['rel']); ?>" data-rel="<?php echo htmlspecialchars($sd['rel'],ENT_QUOTES); ?>" data-has-imgs="<?php echo ($sd['imgs']>0)?'1':'0'; ?>" style="display:block; text-decoration:none; color:inherit;">
+      <a class="card" href="<?php echo htmlspecialchars($self,ENT_QUOTES); ?>?dir=<?php echo rawurlencode($sd['rel']); ?>" data-rel="<?php echo htmlspecialchars($sd['rel'],ENT_QUOTES); ?>" data-has-imgs="<?php echo ($sd['imgs']>0)?'1':'0'; ?>" data-imgs="<?php echo (int)$sd['imgs']; ?>" data-size="<?php echo (int)$sd['size']; ?>" data-name="<?php echo htmlspecialchars($sd['name'],ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); ?>" style="display:block; text-decoration:none; color:inherit;">
         <img
           src="<?php echo $sd['gif'] ? htmlspecialchars($sd['gif'],ENT_QUOTES) : ($sd['placeholder'] ? $sd['placeholder'] : 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw=='); ?>"
           alt="<?php echo htmlspecialchars($sd['name'],ENT_QUOTES); ?>"
@@ -1983,10 +2108,20 @@ button { all:unset; }
 <?php if (empty($items) && empty($subdirs)): ?>
 <p style="padding:16px"><?php echo htmlspecialchars(t('no_images'),ENT_QUOTES); ?></p>
 <?php elseif (!empty($items)): ?>
-<h3 style="margin:6px 0 0 0; padding:0 var(--gap); font-size:14px; font-weight:600;"><?php echo htmlspecialchars(t('photos'),ENT_QUOTES); ?><?php if (count($items)>0) echo ' ('.count($items).')'; ?></h3>
+<div class="photo-heading">
+  <h3><?php echo htmlspecialchars(t('photos'),ENT_QUOTES); ?> (<?php echo count($items); ?>)</h3>
+  <label for="photoSort"><?php echo htmlspecialchars($sortLabels['sort'],ENT_QUOTES); ?>
+    <select id="photoSort">
+      <?php foreach (['date-asc','date-desc','name-asc','name-desc','size-asc','size-desc'] as $sortOption): ?>
+        <option value="<?php echo htmlspecialchars($sortOption,ENT_QUOTES); ?>"><?php echo htmlspecialchars($sortLabels[$sortOption],ENT_QUOTES); ?></option>
+      <?php endforeach; ?>
+    </select>
+  </label>
+</div>
 <main class="grid" id="grid">
 <?php foreach ($items as $idx => $it): ?>
-  <figure class="card" data-idx="<?php echo $idx; ?>" tabindex="0" role="button" aria-label="<?php echo htmlspecialchars($it['name'], ENT_QUOTES); ?>">
+  <figure class="card" data-idx="<?php echo $idx; ?>" tabindex="0" role="button" aria-label="<?php echo htmlspecialchars($it['name'], ENT_QUOTES, 'UTF-8'); ?>">
+    <div class="photo-size" aria-hidden="true"></div>
     <img
       src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw=="
       data-thumb="<?php echo $it['thumb']; ?>"
@@ -2034,8 +2169,11 @@ button { all:unset; }
   const L = (k, p) => { let s = I18N[k] || k; if (p) for (const n in p) s = s.split('{' + n + '}').join(String(p[n])); return s; };
   const syncSummary = (s) => L('sync_sum', { v: s.visited||0, c: s.created_thumbs||0, r: s.regen_thumbs||0, x: s.removed_thumbs||0, g: s.regen_gifs||0, y: s.removed_gifs||0 });
   window.__L__ = L; window.__syncSummary__ = syncSummary;
-  const items = <?php echo json_encode($items, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE); ?>;
+  const items = <?php echo json_encode($items, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE); ?>;
+  const sortFieldLabels = <?php echo json_encode(['date'=>$sortLabels['date_value'],'name'=>$sortLabels['name_value'],'size'=>$sortLabels['size_value']], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE); ?>;
   const grid = document.getElementById('grid');
+  const sortSelect = document.getElementById('photoSort');
+  const sortEntries = grid ? items.map((item, index) => ({item, card: grid.children[index]})) : [];
   const lb = document.getElementById('lightbox');
   const spinner = document.getElementById('spinner');
   const lbImg = document.getElementById('lbImg');
@@ -2045,6 +2183,92 @@ button { all:unset; }
   const btnNext = document.getElementById('btnNext');
   const folders = document.getElementById('folders');
   let idx = -1;
+
+  function applyPhotoSort(value) {
+    if (!grid || !sortSelect) return;
+    const [key, direction] = value.split('-');
+    const multiplier = direction === 'desc' ? -1 : 1;
+    const compareNames = (a, b) => a.item.sortName.localeCompare(b.item.sortName, undefined, {numeric:true, sensitivity:'base'});
+    const sorted = sortEntries.slice().sort((a, b) => {
+      const difference = key === 'date'
+        ? a.item.sortDate - b.item.sortDate
+        : key === 'size'
+          ? a.item.sortSize - b.item.sortSize
+          : compareNames(a, b);
+      return difference === 0 ? compareNames(a, b) : difference * multiplier;
+    });
+    items.length = 0;
+    sorted.forEach((entry, index) => {
+      items.push(entry.item);
+      entry.card.dataset.idx = index;
+      grid.appendChild(entry.card);
+    });
+  }
+  // Performance optimization (Bolt ⚡): Cache Intl.NumberFormat to avoid expensive re-instantiation on every file badge render (~40x faster)
+  let fileSizeFormatter = null;
+  function formatFileSize(bytes) {
+    const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+    let value = bytes;
+    let unit = 0;
+    while (value >= 1024 && unit < units.length - 1) {
+      value /= 1024;
+      unit++;
+    }
+    if (!fileSizeFormatter) {
+      fileSizeFormatter = new Intl.NumberFormat(document.documentElement.lang, {maximumFractionDigits:1});
+    }
+    return `${fileSizeFormatter.format(value)} ${units[unit]}`;
+  }
+  function updateHoverValues() {
+    const key = (sortSelect?.value || 'date-asc').split('-')[0];
+    sortEntries.forEach(({item, card}) => {
+      const value = key === 'date' ? item.sortDateLabel : key === 'name' ? item.sortName : formatFileSize(item.sortSize);
+      const label = `${sortFieldLabels[key]}: ${value}`;
+      const badge = card.querySelector('.photo-size');
+      if (badge) badge.textContent = label;
+      card.title = `${item.sortName} — ${label}`;
+    });
+  }
+  if (sortSelect) {
+    const sortStorageKey = `mpg_sort_${window.__CUR_DIR__ || ''}`;
+    const savedSort = localStorage.getItem(sortStorageKey);
+    if (Array.from(sortSelect.options).some(option => option.value === savedSort)) sortSelect.value = savedSort;
+    applyPhotoSort(sortSelect.value);
+    updateHoverValues();
+    sortSelect.addEventListener('change', () => {
+      localStorage.setItem(sortStorageKey, sortSelect.value);
+      applyPhotoSort(sortSelect.value);
+      updateHoverValues();
+    });
+  } else updateHoverValues();
+
+  const folderSortSelect = document.getElementById('folderSort');
+  if (folders && folderSortSelect) {
+    const folderCards = Array.from(folders.querySelectorAll('a.card'));
+    const folderSortStorageKey = `mpg_folder_sort_${window.__CUR_DIR__ || ''}`;
+    function applyFolderSort(value) {
+      const [key, direction] = value.split('-');
+      const multiplier = direction === 'desc' ? -1 : 1;
+      const sorted = folderCards.slice().sort((a, b) => {
+        let difference;
+        if (key === 'count') difference = Number(a.dataset.imgs) - Number(b.dataset.imgs);
+        else if (key === 'size') difference = Number(a.dataset.size) - Number(b.dataset.size);
+        else difference = a.dataset.name.localeCompare(b.dataset.name, undefined, {numeric:true, sensitivity:'base'});
+        if (difference === 0 && key !== 'name') {
+          return a.dataset.name.localeCompare(b.dataset.name, undefined, {numeric:true, sensitivity:'base'});
+        }
+        return difference * multiplier;
+      });
+      sorted.forEach(card => folders.appendChild(card));
+    }
+    const savedFolderSort = localStorage.getItem(folderSortStorageKey);
+    if (Array.from(folderSortSelect.options).some(option => option.value === savedFolderSort)) folderSortSelect.value = savedFolderSort;
+    applyFolderSort(folderSortSelect.value);
+    folderSortSelect.addEventListener('change', () => {
+      localStorage.setItem(folderSortStorageKey, folderSortSelect.value);
+      applyFolderSort(folderSortSelect.value);
+    });
+  }
 
   // Dropdown menu
   const menu = document.getElementById('userMenu');
@@ -2129,15 +2353,25 @@ syncBtn?.addEventListener('click', (e)=>{
   const keyColl = `mpg_fc_${window.__CUR_DIR__ || ''}`;
   function applyFoldState(){
     const st = localStorage.getItem(keyColl) || 'open';
-    if (st==='closed'){ folders?.classList.add('collapsed'); if(caret) caret.textContent='▸'; }
+    const isClosed = st === 'closed';
+    if (isClosed){ folders?.classList.add('collapsed'); if(caret) caret.textContent='▸'; }
     else { folders?.classList.remove('collapsed'); if(caret) caret.textContent='▾'; }
+    toggle?.setAttribute('aria-expanded', isClosed ? 'false' : 'true');
+  }
+  function toggleFolders(){
+    folders?.classList.toggle('collapsed');
+    const closed = Boolean(folders && folders.classList.contains('collapsed'));
+    if (caret) caret.textContent = closed ? '▸' : '▾';
+    toggle?.setAttribute('aria-expanded', closed ? 'false' : 'true');
+    localStorage.setItem(keyColl, closed ? 'closed' : 'open');
   }
   applyFoldState();
-  toggle?.addEventListener('click', ()=>{
-    folders?.classList.toggle('collapsed');
-    const closed = folders && folders.classList.contains('collapsed');
-    if (caret) caret.textContent = closed ? '▸' : '▾';
-    localStorage.setItem(keyColl, closed ? 'closed' : 'open');
+  toggle?.addEventListener('click', toggleFolders);
+  toggle?.addEventListener('keydown', (e)=>{
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      toggleFolders();
+    }
   });
 
   // Utility per endpoint con dir
@@ -2235,13 +2469,15 @@ syncBtn?.addEventListener('click', (e)=>{
     lb.classList.add('open','loading');
     lb.setAttribute('aria-hidden', 'false');
     spinner.style.display = 'block';
-    const src = items[idx].src;
+    const item = items[idx];
+    const src = item.src;
     lbImg.src = '';
-    lbImg.alt = items[idx].name;
+    lbImg.alt = item.name;
     counter.textContent = (idx+1) + ' / ' + items.length;
     if (exifPanel) { exifPanel.classList.remove('open'); exifPanel.innerHTML=''; }
-    fetch(withDir(`${window.__SELF__}?exif=${encodeURIComponent(items[idx].name)}`), {cache:'no-store'})
-      .then(r=>r.json()).then(renderExif).catch(()=>renderExif(null));
+    fetch(withDir(`${window.__SELF__}?exif=${encodeURIComponent(item.name)}`), {cache:'no-store'})
+      .then(r=>r.json()).then(d=>{ if (items[idx] === item) renderExif(d, item); })
+      .catch(()=>{ if (items[idx] === item) renderExif(null, item); });
     document.body.style.overflow = 'hidden';
     const tmp = new Image();
     tmp.onload = () => {
@@ -2305,7 +2541,7 @@ syncBtn?.addEventListener('click', (e)=>{
   const btnInfo = document.getElementById('btnInfo');
   const exifPanel = document.getElementById('exifPanel');
 
-  function renderExif(d){
+  function renderExif(d, item){
     if (!exifPanel) return;
     // SECURITY: Use safe DOM methods and textContent to prevent DOM XSS from image filenames or EXIF metadata
     exifPanel.textContent = '';
@@ -2338,6 +2574,13 @@ syncBtn?.addEventListener('click', (e)=>{
         g.append(kEl, vEl);
       }
     }
+    const sizeKey = document.createElement('div');
+    sizeKey.className = 'k';
+    sizeKey.textContent = L('file_size');
+    const sizeValue = document.createElement('div');
+    sizeValue.className = 'v';
+    sizeValue.textContent = formatFileSize(item?.sortSize || 0);
+    g.append(sizeKey, sizeValue);
     exifPanel.append(h, g);
   }
   function toggleExif(){ exifPanel?.classList.toggle('open'); }

@@ -17,6 +17,12 @@ The UI is translated into 32 European languages (en, it, fr, de, es, pt, nl, pl,
 - The menu has a language selector; the choice is saved in `.Magic-Photo-Gallery/.config.json` (`"language": "auto"` or a code such as `"de"`).
 - The saved language is global for all visitors. With `auth_mode` 1/2 only logged-in users can change it.
 
+## Photo ordering
+
+Photos are ordered by capture date (EXIF, falling back to the file modification date), oldest first. Use the selector above the photo grid to sort by date, file name, or file size, in either direction. The selected order is saved in the browser for each folder.
+
+Folder lists have their own selector: sort by name, the number of images directly inside each folder, or their combined image-file size. Name ascending is the default, and the selection is saved per folder.
+
 ## Deployment
 
 First, move to your image directory and download the app:
