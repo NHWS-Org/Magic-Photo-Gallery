@@ -1864,6 +1864,10 @@ header { padding: 12px 16px; font-weight: 600; }
   outline: 2px solid #fff;
   outline-offset: 2px;
 }
+.card:focus-visible {
+  outline: 3px solid #2a6fef;
+  outline-offset: 2px;
+}
 button { all:unset; }
 @media (hover:none){
   .card:hover img{transform:none;}
@@ -2515,10 +2519,11 @@ syncBtn?.addEventListener('click', (e)=>{
   grid?.addEventListener('keydown', e => {
     if (e.key === 'Enter' || e.key === ' ') {
       const fig = e.target.closest('.card');
-      if (!fig) return;
-      e.preventDefault();
-      const i = parseInt(fig.dataset.idx, 10);
-      if (!Number.isNaN(i)) openAt(i);
+      if (fig && grid.contains(fig)) {
+        e.preventDefault();
+        const i = parseInt(fig.dataset.idx, 10);
+        if (!Number.isNaN(i)) openAt(i);
+      }
     }
   });
   btnClose.addEventListener('click', closeLb);
