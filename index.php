@@ -1751,6 +1751,10 @@ header { padding: 12px 16px; font-weight: 600; }
   outline: 2px solid #fff;
   outline-offset: 2px;
 }
+.card:focus-visible {
+  outline: 3px solid #2a6fef;
+  outline-offset: 2px;
+}
 button { all:unset; }
 @media (hover:none){ .card:hover img{transform:none;} }
 .collapsed { display:none !important; }
@@ -1982,7 +1986,7 @@ button { all:unset; }
 <h3 style="margin:6px 0 0 0; padding:0 var(--gap); font-size:14px; font-weight:600;"><?php echo htmlspecialchars(t('photos'),ENT_QUOTES); ?><?php if (count($items)>0) echo ' ('.count($items).')'; ?></h3>
 <main class="grid" id="grid">
 <?php foreach ($items as $idx => $it): ?>
-  <figure class="card" data-idx="<?php echo $idx; ?>">
+  <figure class="card" data-idx="<?php echo $idx; ?>" tabindex="0" role="button" aria-label="<?php echo htmlspecialchars($it['name'], ENT_QUOTES); ?>">
     <img
       src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw=="
       data-thumb="<?php echo $it['thumb']; ?>"
@@ -2275,6 +2279,16 @@ syncBtn?.addEventListener('click', (e)=>{
     }
     const i = parseInt(fig.dataset.idx, 10);
     if (!Number.isNaN(i)) openAt(i);
+  });
+  grid?.addEventListener('keydown', e => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      const fig = e.target.closest('.card');
+      if (fig && grid.contains(fig)) {
+        e.preventDefault();
+        const i = parseInt(fig.dataset.idx, 10);
+        if (!Number.isNaN(i)) openAt(i);
+      }
+    }
   });
   btnClose.addEventListener('click', closeLb);
   btnPrev.addEventListener('click', prev);
