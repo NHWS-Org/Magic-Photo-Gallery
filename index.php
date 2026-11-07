@@ -4,6 +4,10 @@ if (!headers_sent()) {
     header('X-Content-Type-Options: nosniff');
     header('X-Frame-Options: SAMEORIGIN');
     header('Referrer-Policy: strict-origin-when-cross-origin');
+    // SECURITY: Restrict browser features/APIs not needed by the gallery application
+    header('Permissions-Policy: camera=(), microphone=(), geolocation=()');
+    // SECURITY: Isolate browsing context from cross-origin openers/popups (prevent XS-Leaks / Spectre-style window interactions)
+    header('Cross-Origin-Opener-Policy: same-origin');
 }
 
 // === CONFIGURAZIONE ===
