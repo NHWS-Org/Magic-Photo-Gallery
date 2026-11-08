@@ -404,9 +404,18 @@ function is_excluded_dir($entryName, $relativePath = '') {
 // === ENDPOINT: genera hash per password ===
 if (isset($_GET['mkhash'])) {
     header('Content-Type: application/json; charset=utf-8');
+    header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+    header('Pragma: no-cache');
+    // SECURITY: Use POST and require CSRF token to prevent password leakage via URL query strings/logs and CSRF attacks
+    if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') { http_response_code(405); echo json_encode(['ok'=>false,'error'=>'method_not_allowed']); exit; }
     if ((int)$cfg['auth_mode'] === 0 || !auth_ok()) { http_response_code(401); echo json_encode(['ok'=>false,'error'=>'unauthorized']); exit; }
-    $plain = (string)($_GET['mkhash'] ?? '');
-    if ($plain === '') { echo json_encode(['ok'=>false,'error'=>'empty']); exit; }
+    $payload = json_decode(file_get_contents('php://input'), true) ?: [];
+    $csrf = (string)($payload['csrf'] ?? '');
+    if (!isset($_SESSION['csrf']) || !hash_equals($_SESSION['csrf'], $csrf)) {
+        http_response_code(403); echo json_encode(['ok'=>false,'error'=>'forbidden']); exit;
+    }
+    $plain = (string)($payload['pass'] ?? '');
+    if ($plain === '') { http_response_code(400); echo json_encode(['ok'=>false,'error'=>'empty']); exit; }
     $hash = password_hash($plain, PASSWORD_DEFAULT);
     echo json_encode(['ok'=>true,'hash'=>$hash], JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE);
     exit;
@@ -2447,7 +2456,12 @@ syncBtn?.addEventListener('click', (e)=>{
     e.preventDefault();
     const pwd = prompt(L('hash_prompt'));
     if (!pwd) return;
-    fetch(withDir(`${window.__SELF__}?mkhash=${encodeURIComponent(pwd)}`), { cache:'no-store' })
+    fetch(`${window.__SELF__}?mkhash=1`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      cache: 'no-store',
+      body: JSON.stringify({ pass: pwd, csrf: window.__CSRF__ || '' })
+    })
       .then(r=>r.json())
       .then(d=>{
         if (d && d.ok && d.hash) {
