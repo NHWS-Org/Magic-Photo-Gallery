@@ -2148,11 +2148,11 @@ button { all:unset; }
 
 <div class="lightbox" id="lightbox" role="dialog" aria-modal="true" aria-label="<?php echo htmlspecialchars(t('viewer'),ENT_QUOTES); ?>" aria-hidden="true">
   <div class="spinner" id="spinner" aria-hidden="true"></div>
-  <button class="close" id="btnClose" aria-label="<?php echo htmlspecialchars(t('close'),ENT_QUOTES); ?>">✕</button>
-  <button class="nav prev" id="btnPrev" aria-label="<?php echo htmlspecialchars(t('prev'),ENT_QUOTES); ?>">❮</button>
+  <button class="close" id="btnClose" title="<?php echo htmlspecialchars(t('close'),ENT_QUOTES); ?>" aria-label="<?php echo htmlspecialchars(t('close'),ENT_QUOTES); ?>">✕</button>
+  <button class="nav prev" id="btnPrev" title="<?php echo htmlspecialchars(t('prev'),ENT_QUOTES); ?>" aria-label="<?php echo htmlspecialchars(t('prev'),ENT_QUOTES); ?>">❮</button>
   <div class="lb-img-wrap"><img id="lbImg" alt=""></div>
-  <button class="nav next" id="btnNext" aria-label="<?php echo htmlspecialchars(t('next'),ENT_QUOTES); ?>">❯</button>
-  <button class="info" id="btnInfo" title="<?php echo htmlspecialchars(t('info'),ENT_QUOTES); ?>" aria-label="<?php echo htmlspecialchars(t('info'),ENT_QUOTES); ?>">ℹ︎</button>
+  <button class="nav next" id="btnNext" title="<?php echo htmlspecialchars(t('next'),ENT_QUOTES); ?>" aria-label="<?php echo htmlspecialchars(t('next'),ENT_QUOTES); ?>">❯</button>
+  <button class="info" id="btnInfo" title="<?php echo htmlspecialchars(t('info'),ENT_QUOTES); ?>" aria-label="<?php echo htmlspecialchars(t('info'),ENT_QUOTES); ?>" aria-controls="exifPanel" aria-expanded="false">ℹ︎</button>
   <div class="exif" id="exifPanel" aria-live="polite"></div>
   <div class="counter" id="counter"></div>
 </div>
@@ -2190,6 +2190,8 @@ button { all:unset; }
   const btnClose = document.getElementById('btnClose');
   const btnPrev = document.getElementById('btnPrev');
   const btnNext = document.getElementById('btnNext');
+  const btnInfo = document.getElementById('btnInfo');
+  const exifPanel = document.getElementById('exifPanel');
   const folders = document.getElementById('folders');
   let idx = -1;
 
@@ -2484,6 +2486,7 @@ syncBtn?.addEventListener('click', (e)=>{
     lbImg.alt = item.name;
     counter.textContent = (idx+1) + ' / ' + items.length;
     if (exifPanel) { exifPanel.classList.remove('open'); exifPanel.innerHTML=''; }
+    btnInfo?.setAttribute('aria-expanded', 'false');
     fetch(withDir(`${window.__SELF__}?exif=${encodeURIComponent(item.name)}`), {cache:'no-store'})
       .then(r=>r.json()).then(d=>{ if (items[idx] === item) renderExif(d, item); })
       .catch(()=>{ if (items[idx] === item) renderExif(null, item); });
@@ -2504,6 +2507,7 @@ syncBtn?.addEventListener('click', (e)=>{
   function closeLb(){
     lb.classList.remove('open');
     lb.setAttribute('aria-hidden', 'true');
+    btnInfo?.setAttribute('aria-expanded', 'false');
     document.body.style.overflow = '';
     lbImg.src = '';
     if (lastFocused && typeof lastFocused.focus === 'function') {
@@ -2539,17 +2543,27 @@ syncBtn?.addEventListener('click', (e)=>{
   btnPrev.addEventListener('click', prev);
   btnNext.addEventListener('click', next);
   lb.addEventListener('click', e => { if (e.target === lb) closeLb(); });
+  const lbControls = [btnClose, btnPrev, btnNext, btnInfo];
   window.addEventListener('keydown', e => {
     if (!lb.classList.contains('open')) return;
-    if (e.key === 'Escape') closeLb();
+    if (e.key === 'Tab') {
+      const focusables = lbControls.filter(el => el && el.offsetParent !== null);
+      if (!focusables.length) return;
+      const first = focusables[0];
+      const last = focusables[focusables.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    } else if (e.key === 'Escape') closeLb();
     else if (e.key === 'ArrowLeft') prev();
     else if (e.key === 'ArrowRight') next();
     else if (e.key && e.key.toLowerCase() === 'i') { e.preventDefault(); toggleExif(); }
   });
   // EXIF panel
-  const btnInfo = document.getElementById('btnInfo');
-  const exifPanel = document.getElementById('exifPanel');
-
   function renderExif(d, item){
     if (!exifPanel) return;
     // SECURITY: Use safe DOM methods and textContent to prevent DOM XSS from image filenames or EXIF metadata
@@ -2592,7 +2606,11 @@ syncBtn?.addEventListener('click', (e)=>{
     g.append(sizeKey, sizeValue);
     exifPanel.append(h, g);
   }
-  function toggleExif(){ exifPanel?.classList.toggle('open'); }
+  function toggleExif(){
+    if (!exifPanel) return;
+    const isOpen = exifPanel.classList.toggle('open');
+    btnInfo?.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+  }
   btnInfo?.addEventListener('click', (e)=>{ e.preventDefault(); toggleExif(); });
 
   // === Generazione asincrona GIF per cartelle ===
