@@ -1306,7 +1306,13 @@ function sync_one_dir($rel,$baseDir,$thumbsRoot,$prefThumb,$folderGifName,$cfg){
     if(!is_dir($srcDir)){ if(is_dir($thDir)){ rrmdir($thDir); $st['removed_dirs']++; } return $st; }
     if(!is_dir($thDir)) @mkdir($thDir,0755,true);
 
-    $srcMap=build_src_map($srcDir);
+    // Performance optimization (Bolt ⚡): Call list_images($srcDir) once and build $srcMap from it.
+    // Avoids redundant filesystem traversal and natsort overhead from duplicate list_images() calls.
+    $files=list_images($srcDir);
+    $srcMap=[];
+    foreach($files as $p){
+        $srcMap[strtolower(pathinfo($p,PATHINFO_FILENAME))]=$p;
+    }
 
     // rimuovi thumbs orfane
     if($h=@opendir($thDir)){ while(false!==($f=readdir($h))){
@@ -1332,7 +1338,6 @@ function sync_one_dir($rel,$baseDir,$thumbsRoot,$prefThumb,$folderGifName,$cfg){
 
     // gif cartella
     $gifPath=$thDir.'/'.$folderGifName;
-    $files=list_images($srcDir);
     if(empty($files)){ if(is_file($gifPath)){ @unlink($gifPath); $st['removed_gifs']++; } }
     else {
         $latest=0; foreach($files as $sp){ $t=@filemtime($sp)?:0; if($t>$latest)$latest=$t; }
