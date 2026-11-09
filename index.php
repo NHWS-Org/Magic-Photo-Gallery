@@ -395,12 +395,18 @@ function is_excluded_dir($entryName, $relativePath = '') {
     global $cfg;
     // escludi sempre cartelle che iniziano con punto
     if ($entryName === '' || $entryName[0] === '.') return true;
-    // confronta per nome semplice e per path relativo normalizzato
+    // SECURITY: Ensure no segment in relative path is hidden or inside an excluded directory to prevent path traversal bypasses
     $rel = str_replace(['\\'], '/', trim($relativePath, '/'));
+    if ($rel !== '') {
+        foreach (explode('/', $rel) as $seg) {
+            if ($seg === '' || $seg[0] === '.') return true;
+            foreach ($cfg['exclude_dirs'] as $e) {
+                if ($e !== '' && strcasecmp($seg, $e) === 0) return true;
+            }
+        }
+    }
     foreach ($cfg['exclude_dirs'] as $e) {
-        if ($e === '') continue;
-        if (strcasecmp($entryName, $e) === 0) return true;
-        if ($rel !== '' && strcasecmp($rel, $e) === 0) return true;
+        if ($e !== '' && strcasecmp($entryName, $e) === 0) return true;
     }
     return false;
 }
@@ -853,6 +859,8 @@ if (isset($_GET['gif_progress'])) {
     if ((int)$cfg['auth_mode'] === 2 && !auth_ok()) { http_response_code(401); echo json_encode(['ok'=>false,'error'=>'unauthorized']); exit; }
     $dirRel = trim(str_replace(['\\'],'/', ltrim($_GET['gif_progress'],'/')));
     if (strpos($dirRel,'..') !== false) { echo json_encode(['ok'=>false]); exit; }
+    // SECURITY: Reject excluded or hidden directories to avoid probing internal folders
+    if ($dirRel !== '' && is_excluded_dir(basename($dirRel), $dirRel)) { echo json_encode(['ok'=>false,'error'=>'excluded']); exit; }
     $ppath = folder_gif_progress_path($dirRel, $thumbsRoot, $prefThumb);
     if (!is_file($ppath)) { echo json_encode(['ok'=>true,'exists'=>false,'total'=>0,'done'=>0]); exit; }
     $data = @json_decode(@file_get_contents($ppath), true) ?: [];
@@ -1207,6 +1215,8 @@ if (isset($_GET['purge_cache'])) {
 
     $targetRel = trim(str_replace(['\\'],'/', ltrim($_GET['dir'] ?? $relDir, '/')));
     if (strpos($targetRel,'..') !== false) { echo json_encode(['ok'=>false,'error'=>'bad_rel']); exit; }
+    // SECURITY: Reject excluded or hidden directories from being purged
+    if ($targetRel !== '' && is_excluded_dir(basename($targetRel), $targetRel)) { echo json_encode(['ok'=>false,'error'=>'excluded']); exit; }
     $recursive = !empty($payload['recursive']);
     $purged = ['thumbs'=>0,'gifs'=>0,'dirs'=>0];
 
@@ -1465,6 +1475,8 @@ if (isset($_GET['sync_cache'])) {
 
     $targetRel = trim(str_replace(['\\'],'/', ltrim($_GET['dir'] ?? $relDir, '/')));
     if (strpos($targetRel,'..') !== false) { echo json_encode(['ok'=>false,'error'=>'bad_rel']); exit; }
+    // SECURITY: Reject excluded or hidden directories from cache synchronization
+    if ($targetRel !== '' && is_excluded_dir(basename($targetRel), $targetRel)) { echo json_encode(['ok'=>false,'error'=>'excluded']); exit; }
     $recursive = isset($payload['recursive']) ? (bool)$payload['recursive'] : true;
 
     $sum=['removed_thumbs'=>0,'removed_gifs'=>0,'removed_dirs'=>0,'regen_thumbs'=>0,'regen_gifs'=>0,'created_thumbs'=>0,'indexed'=>0,'visited'=>0];
