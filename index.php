@@ -310,9 +310,10 @@ function img_dims($path) {
 function rel($abs) {
     // Converte un path assoluto del filesystem in path URL relativo alla directory dello script
     $abs = str_replace('\\', '/', $abs);
-    $baseFs = str_replace('\\', '/', realpath($GLOBALS['baseDir']));
+    $baseFs = rtrim(str_replace('\\', '/', realpath($GLOBALS['baseDir'])), '/');
     $baseUrl = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? '/')), '/');
-    if (strpos($abs, $baseFs) === 0) {
+    // SECURITY: Enforce strict boundary matching to prevent prefix confusion with sibling paths
+    if ($abs === $baseFs || strpos($abs, $baseFs . '/') === 0) {
         $suffix = ltrim(substr($abs, strlen($baseFs)), '/');
         // Se lo script è in root, non aggiungere doppio slash
         if ($baseUrl === '' || $baseUrl === '/') {
@@ -354,8 +355,9 @@ $reqDir = ltrim($reqDir, '/');
 // blocca risalite
 if (strpos($reqDir, '..') !== false) { $reqDir = ''; }
 $currentAbs = realpath($baseDir . ($reqDir ? '/' . $reqDir : '')) ?: $baseDir;
-// Enforce sotto-albero
-if (strpos($currentAbs, realpath($baseDir)) !== 0) { $currentAbs = $baseDir; $reqDir = ''; }
+// SECURITY: Enforce subtree boundary with trailing separator to prevent path prefix confusion (e.g. /app vs /app_secret)
+$realBaseDir = rtrim(realpath($baseDir), DIRECTORY_SEPARATOR);
+if ($currentAbs !== $realBaseDir && strpos($currentAbs, $realBaseDir . DIRECTORY_SEPARATOR) !== 0) { $currentAbs = $baseDir; $reqDir = ''; }
 $relDir = trim(str_replace(realpath($baseDir), '', $currentAbs), DIRECTORY_SEPARATOR);
 $relDir = str_replace(DIRECTORY_SEPARATOR, '/', $relDir);
 // blocca l'accesso a cartelle escluse
@@ -390,17 +392,21 @@ function folder_gif_progress_path($dirRel, $thumbsRoot, $prefThumb) {
     return $dir . DIRECTORY_SEPARATOR . $prefThumb . $safe . '.json';
 }
 
-// helper: verifica se una cartella va esclusa
+// SECURITY: Helper per verificare se una cartella o percorso va escluso (inclusi segmenti antenati e cartelle nascoste)
 function is_excluded_dir($entryName, $relativePath = '') {
     global $cfg;
-    // escludi sempre cartelle che iniziano con punto
     if ($entryName === '' || $entryName[0] === '.') return true;
-    // confronta per nome semplice e per path relativo normalizzato
-    $rel = str_replace(['\\'], '/', trim($relativePath, '/'));
+    $rel = str_replace('\\', '/', trim($relativePath, '/'));
+    if ($rel !== '') {
+        foreach (explode('/', $rel) as $seg) {
+            if ($seg === '' || $seg[0] === '.') return true;
+            foreach ($cfg['exclude_dirs'] as $e) {
+                if ($e !== '' && strcasecmp($seg, $e) === 0) return true;
+            }
+        }
+    }
     foreach ($cfg['exclude_dirs'] as $e) {
-        if ($e === '') continue;
-        if (strcasecmp($entryName, $e) === 0) return true;
-        if ($rel !== '' && strcasecmp($rel, $e) === 0) return true;
+        if ($e !== '' && strcasecmp($entryName, $e) === 0) return true;
     }
     return false;
 }
@@ -852,7 +858,8 @@ if (isset($_GET['gif_progress'])) {
     // SECURITY: Prevent unauthorized information leakage when gallery requires full authentication
     if ((int)$cfg['auth_mode'] === 2 && !auth_ok()) { http_response_code(401); echo json_encode(['ok'=>false,'error'=>'unauthorized']); exit; }
     $dirRel = trim(str_replace(['\\'],'/', ltrim($_GET['gif_progress'],'/')));
-    if (strpos($dirRel,'..') !== false) { echo json_encode(['ok'=>false]); exit; }
+    // SECURITY: Enforce directory traversal and excluded directory checks
+    if (strpos($dirRel,'..') !== false || ($dirRel !== '' && is_excluded_dir(basename($dirRel), $dirRel))) { echo json_encode(['ok'=>false]); exit; }
     $ppath = folder_gif_progress_path($dirRel, $thumbsRoot, $prefThumb);
     if (!is_file($ppath)) { echo json_encode(['ok'=>true,'exists'=>false,'total'=>0,'done'=>0]); exit; }
     $data = @json_decode(@file_get_contents($ppath), true) ?: [];
@@ -873,7 +880,8 @@ if (isset($_GET['make_gif'])) {
     $dirRel = trim(str_replace(['\\'],'/', ltrim($_GET['make_gif'],'/')));
     if (strpos($dirRel,'..') !== false) { echo json_encode(['ok'=>false]); exit; }
     $srcAbs = realpath($baseDir . ($dirRel ? '/' . $dirRel : '')) ?: $baseDir;
-    if (strpos($srcAbs, realpath($baseDir)) !== 0) { echo json_encode(['ok'=>false]); exit; }
+    // SECURITY: Enforce directory boundary with trailing separator to prevent prefix confusion
+    if ($srcAbs !== $realBaseDir && strpos($srcAbs, $realBaseDir . DIRECTORY_SEPARATOR) !== 0) { echo json_encode(['ok'=>false]); exit; }
     // rifiuta se il target è escluso
     if ($dirRel !== '') {
         $last = basename($dirRel);
@@ -1206,7 +1214,8 @@ if (isset($_GET['purge_cache'])) {
     }
 
     $targetRel = trim(str_replace(['\\'],'/', ltrim($_GET['dir'] ?? $relDir, '/')));
-    if (strpos($targetRel,'..') !== false) { echo json_encode(['ok'=>false,'error'=>'bad_rel']); exit; }
+    // SECURITY: Prevent path traversal or tampering with excluded directory caches
+    if (strpos($targetRel,'..') !== false || ($targetRel !== '' && is_excluded_dir(basename($targetRel), $targetRel))) { echo json_encode(['ok'=>false,'error'=>'bad_rel']); exit; }
     $recursive = !empty($payload['recursive']);
     $purged = ['thumbs'=>0,'gifs'=>0,'dirs'=>0];
 
@@ -1464,7 +1473,8 @@ if (isset($_GET['sync_cache'])) {
     @set_time_limit(0);
 
     $targetRel = trim(str_replace(['\\'],'/', ltrim($_GET['dir'] ?? $relDir, '/')));
-    if (strpos($targetRel,'..') !== false) { echo json_encode(['ok'=>false,'error'=>'bad_rel']); exit; }
+    // SECURITY: Prevent path traversal or operations on excluded directories
+    if (strpos($targetRel,'..') !== false || ($targetRel !== '' && is_excluded_dir(basename($targetRel), $targetRel))) { echo json_encode(['ok'=>false,'error'=>'bad_rel']); exit; }
     $recursive = isset($payload['recursive']) ? (bool)$payload['recursive'] : true;
 
     $sum=['removed_thumbs'=>0,'removed_gifs'=>0,'removed_dirs'=>0,'regen_thumbs'=>0,'regen_gifs'=>0,'created_thumbs'=>0,'indexed'=>0,'visited'=>0];
