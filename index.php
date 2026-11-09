@@ -4,6 +4,10 @@ if (!headers_sent()) {
     header('X-Content-Type-Options: nosniff');
     header('X-Frame-Options: SAMEORIGIN');
     header('Referrer-Policy: strict-origin-when-cross-origin');
+    // SECURITY: Restrict browser features/APIs not needed by the gallery application
+    header('Permissions-Policy: camera=(), microphone=(), geolocation=()');
+    // SECURITY: Isolate browsing context from cross-origin openers/popups (prevent XS-Leaks / Spectre-style window interactions)
+    header('Cross-Origin-Opener-Policy: same-origin');
 }
 
 // === CONFIGURAZIONE ===
@@ -391,12 +395,18 @@ function is_excluded_dir($entryName, $relativePath = '') {
     global $cfg;
     // escludi sempre cartelle che iniziano con punto
     if ($entryName === '' || $entryName[0] === '.') return true;
-    // confronta per nome semplice e per path relativo normalizzato
+    // SECURITY: Ensure no segment in relative path is hidden or inside an excluded directory to prevent path traversal bypasses
     $rel = str_replace(['\\'], '/', trim($relativePath, '/'));
+    if ($rel !== '') {
+        foreach (explode('/', $rel) as $seg) {
+            if ($seg === '' || $seg[0] === '.') return true;
+            foreach ($cfg['exclude_dirs'] as $e) {
+                if ($e !== '' && strcasecmp($seg, $e) === 0) return true;
+            }
+        }
+    }
     foreach ($cfg['exclude_dirs'] as $e) {
-        if ($e === '') continue;
-        if (strcasecmp($entryName, $e) === 0) return true;
-        if ($rel !== '' && strcasecmp($rel, $e) === 0) return true;
+        if ($e !== '' && strcasecmp($entryName, $e) === 0) return true;
     }
     return false;
 }
@@ -404,9 +414,18 @@ function is_excluded_dir($entryName, $relativePath = '') {
 // === ENDPOINT: genera hash per password ===
 if (isset($_GET['mkhash'])) {
     header('Content-Type: application/json; charset=utf-8');
+    header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+    header('Pragma: no-cache');
+    // SECURITY: Use POST and require CSRF token to prevent password leakage via URL query strings/logs and CSRF attacks
+    if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') { http_response_code(405); echo json_encode(['ok'=>false,'error'=>'method_not_allowed']); exit; }
     if ((int)$cfg['auth_mode'] === 0 || !auth_ok()) { http_response_code(401); echo json_encode(['ok'=>false,'error'=>'unauthorized']); exit; }
-    $plain = (string)($_GET['mkhash'] ?? '');
-    if ($plain === '') { echo json_encode(['ok'=>false,'error'=>'empty']); exit; }
+    $payload = json_decode(file_get_contents('php://input'), true) ?: [];
+    $csrf = (string)($payload['csrf'] ?? '');
+    if (!isset($_SESSION['csrf']) || !hash_equals($_SESSION['csrf'], $csrf)) {
+        http_response_code(403); echo json_encode(['ok'=>false,'error'=>'forbidden']); exit;
+    }
+    $plain = (string)($payload['pass'] ?? '');
+    if ($plain === '') { http_response_code(400); echo json_encode(['ok'=>false,'error'=>'empty']); exit; }
     $hash = password_hash($plain, PASSWORD_DEFAULT);
     echo json_encode(['ok'=>true,'hash'=>$hash], JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE);
     exit;
@@ -849,6 +868,8 @@ if (isset($_GET['gif_progress'])) {
     if ((int)$cfg['auth_mode'] === 2 && !auth_ok()) { http_response_code(401); echo json_encode(['ok'=>false,'error'=>'unauthorized']); exit; }
     $dirRel = trim(str_replace(['\\'],'/', ltrim($_GET['gif_progress'],'/')));
     if (strpos($dirRel,'..') !== false) { echo json_encode(['ok'=>false]); exit; }
+    // SECURITY: Reject excluded or hidden directories to avoid probing internal folders
+    if ($dirRel !== '' && is_excluded_dir(basename($dirRel), $dirRel)) { echo json_encode(['ok'=>false,'error'=>'excluded']); exit; }
     $ppath = folder_gif_progress_path($dirRel, $thumbsRoot, $prefThumb);
     if (!is_file($ppath)) { echo json_encode(['ok'=>true,'exists'=>false,'total'=>0,'done'=>0]); exit; }
     $data = @json_decode(@file_get_contents($ppath), true) ?: [];
@@ -1203,6 +1224,8 @@ if (isset($_GET['purge_cache'])) {
 
     $targetRel = trim(str_replace(['\\'],'/', ltrim($_GET['dir'] ?? $relDir, '/')));
     if (strpos($targetRel,'..') !== false) { echo json_encode(['ok'=>false,'error'=>'bad_rel']); exit; }
+    // SECURITY: Reject excluded or hidden directories from being purged
+    if ($targetRel !== '' && is_excluded_dir(basename($targetRel), $targetRel)) { echo json_encode(['ok'=>false,'error'=>'excluded']); exit; }
     $recursive = !empty($payload['recursive']);
     $purged = ['thumbs'=>0,'gifs'=>0,'dirs'=>0];
 
@@ -1302,7 +1325,13 @@ function sync_one_dir($rel,$baseDir,$thumbsRoot,$prefThumb,$folderGifName,$cfg){
     if(!is_dir($srcDir)){ if(is_dir($thDir)){ rrmdir($thDir); $st['removed_dirs']++; } return $st; }
     if(!is_dir($thDir)) @mkdir($thDir,0755,true);
 
-    $srcMap=build_src_map($srcDir);
+    // Performance optimization (Bolt ⚡): Call list_images($srcDir) once and build $srcMap from it.
+    // Avoids redundant filesystem traversal and natsort overhead from duplicate list_images() calls.
+    $files=list_images($srcDir);
+    $srcMap=[];
+    foreach($files as $p){
+        $srcMap[strtolower(pathinfo($p,PATHINFO_FILENAME))]=$p;
+    }
 
     // rimuovi thumbs orfane
     if($h=@opendir($thDir)){ while(false!==($f=readdir($h))){
@@ -1328,7 +1357,6 @@ function sync_one_dir($rel,$baseDir,$thumbsRoot,$prefThumb,$folderGifName,$cfg){
 
     // gif cartella
     $gifPath=$thDir.'/'.$folderGifName;
-    $files=list_images($srcDir);
     if(empty($files)){ if(is_file($gifPath)){ @unlink($gifPath); $st['removed_gifs']++; } }
     else {
         $latest=0; foreach($files as $sp){ $t=@filemtime($sp)?:0; if($t>$latest)$latest=$t; }
@@ -1456,6 +1484,8 @@ if (isset($_GET['sync_cache'])) {
 
     $targetRel = trim(str_replace(['\\'],'/', ltrim($_GET['dir'] ?? $relDir, '/')));
     if (strpos($targetRel,'..') !== false) { echo json_encode(['ok'=>false,'error'=>'bad_rel']); exit; }
+    // SECURITY: Reject excluded or hidden directories from cache synchronization
+    if ($targetRel !== '' && is_excluded_dir(basename($targetRel), $targetRel)) { echo json_encode(['ok'=>false,'error'=>'excluded']); exit; }
     $recursive = isset($payload['recursive']) ? (bool)$payload['recursive'] : true;
 
     $sum=['removed_thumbs'=>0,'removed_gifs'=>0,'removed_dirs'=>0,'regen_thumbs'=>0,'regen_gifs'=>0,'created_thumbs'=>0,'indexed'=>0,'visited'=>0];
@@ -2139,11 +2169,11 @@ button { all:unset; }
 
 <div class="lightbox" id="lightbox" role="dialog" aria-modal="true" aria-label="<?php echo htmlspecialchars(t('viewer'),ENT_QUOTES); ?>" aria-hidden="true">
   <div class="spinner" id="spinner" aria-hidden="true"></div>
-  <button class="close" id="btnClose" aria-label="<?php echo htmlspecialchars(t('close'),ENT_QUOTES); ?>">✕</button>
-  <button class="nav prev" id="btnPrev" aria-label="<?php echo htmlspecialchars(t('prev'),ENT_QUOTES); ?>">❮</button>
+  <button class="close" id="btnClose" title="<?php echo htmlspecialchars(t('close'),ENT_QUOTES); ?>" aria-label="<?php echo htmlspecialchars(t('close'),ENT_QUOTES); ?>">✕</button>
+  <button class="nav prev" id="btnPrev" title="<?php echo htmlspecialchars(t('prev'),ENT_QUOTES); ?>" aria-label="<?php echo htmlspecialchars(t('prev'),ENT_QUOTES); ?>">❮</button>
   <div class="lb-img-wrap"><img id="lbImg" alt=""></div>
-  <button class="nav next" id="btnNext" aria-label="<?php echo htmlspecialchars(t('next'),ENT_QUOTES); ?>">❯</button>
-  <button class="info" id="btnInfo" title="<?php echo htmlspecialchars(t('info'),ENT_QUOTES); ?>" aria-label="<?php echo htmlspecialchars(t('info'),ENT_QUOTES); ?>">ℹ︎</button>
+  <button class="nav next" id="btnNext" title="<?php echo htmlspecialchars(t('next'),ENT_QUOTES); ?>" aria-label="<?php echo htmlspecialchars(t('next'),ENT_QUOTES); ?>">❯</button>
+  <button class="info" id="btnInfo" title="<?php echo htmlspecialchars(t('info'),ENT_QUOTES); ?>" aria-label="<?php echo htmlspecialchars(t('info'),ENT_QUOTES); ?>" aria-controls="exifPanel" aria-expanded="false">ℹ︎</button>
   <div class="exif" id="exifPanel" aria-live="polite"></div>
   <div class="counter" id="counter"></div>
 </div>
@@ -2181,31 +2211,32 @@ button { all:unset; }
   const btnClose = document.getElementById('btnClose');
   const btnPrev = document.getElementById('btnPrev');
   const btnNext = document.getElementById('btnNext');
+  const btnInfo = document.getElementById('btnInfo');
+  const exifPanel = document.getElementById('exifPanel');
   const folders = document.getElementById('folders');
   let idx = -1;
 
-  // Performance optimization (Bolt ⚡): Cache Intl.Collator for natural name comparisons.
-  // Replaces repeated localeCompare() calls whose locale option parsing overhead makes sorting
-  // O(N log N * localeOptionsCost). Cached collator speeds up photo and folder sorting by ~15x-25x.
-  const nameCollator = (typeof Intl !== 'undefined' && Intl.Collator)
-    ? new Intl.Collator(undefined, {numeric: true, sensitivity: 'base'})
+  // Performance optimization (Bolt ⚡): Cache Intl.Collator for natural name sorting.
+  // Calling string.localeCompare() with options inside Array.prototype.sort creates a new Collator
+  // per comparison (O(N log N)), taking seconds on large galleries. Reusing a single Collator is ~25x faster.
+  const naturalCollator = (typeof Intl !== 'undefined' && Intl.Collator)
+    ? new Intl.Collator(undefined, {numeric:true, sensitivity:'base'})
     : null;
-  const naturalCompare = (a, b) => nameCollator
-    ? nameCollator.compare(a, b)
-    : a.localeCompare(b, undefined, {numeric: true, sensitivity: 'base'});
+  const naturalCompare = (a, b) => naturalCollator
+    ? naturalCollator.compare(a, b)
+    : a.localeCompare(b, undefined, {numeric:true, sensitivity:'base'});
 
   function applyPhotoSort(value) {
     if (!grid || !sortSelect) return;
     const [key, direction] = value.split('-');
     const multiplier = direction === 'desc' ? -1 : 1;
-    const compareNames = (a, b) => naturalCompare(a.item.sortName, b.item.sortName);
     const sorted = sortEntries.slice().sort((a, b) => {
       const difference = key === 'date'
         ? a.item.sortDate - b.item.sortDate
         : key === 'size'
           ? a.item.sortSize - b.item.sortSize
-          : compareNames(a, b);
-      return difference === 0 ? compareNames(a, b) : difference * multiplier;
+          : naturalCompare(a.item.sortName, b.item.sortName);
+      return difference === 0 ? naturalCompare(a.item.sortName, b.item.sortName) : difference * multiplier;
     });
     items.length = 0;
     sorted.forEach((entry, index) => {
@@ -2457,7 +2488,12 @@ syncBtn?.addEventListener('click', (e)=>{
     e.preventDefault();
     const pwd = prompt(L('hash_prompt'));
     if (!pwd) return;
-    fetch(withDir(`${window.__SELF__}?mkhash=${encodeURIComponent(pwd)}`), { cache:'no-store' })
+    fetch(`${window.__SELF__}?mkhash=1`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      cache: 'no-store',
+      body: JSON.stringify({ pass: pwd, csrf: window.__CSRF__ || '' })
+    })
       .then(r=>r.json())
       .then(d=>{
         if (d && d.ok && d.hash) {
@@ -2485,6 +2521,7 @@ syncBtn?.addEventListener('click', (e)=>{
     lbImg.alt = item.name;
     counter.textContent = (idx+1) + ' / ' + items.length;
     if (exifPanel) { exifPanel.classList.remove('open'); exifPanel.innerHTML=''; }
+    btnInfo?.setAttribute('aria-expanded', 'false');
     fetch(withDir(`${window.__SELF__}?exif=${encodeURIComponent(item.name)}`), {cache:'no-store'})
       .then(r=>r.json()).then(d=>{ if (items[idx] === item) renderExif(d, item); })
       .catch(()=>{ if (items[idx] === item) renderExif(null, item); });
@@ -2505,6 +2542,7 @@ syncBtn?.addEventListener('click', (e)=>{
   function closeLb(){
     lb.classList.remove('open');
     lb.setAttribute('aria-hidden', 'true');
+    btnInfo?.setAttribute('aria-expanded', 'false');
     document.body.style.overflow = '';
     lbImg.src = '';
     if (lastFocused && typeof lastFocused.focus === 'function') {
@@ -2540,17 +2578,27 @@ syncBtn?.addEventListener('click', (e)=>{
   btnPrev.addEventListener('click', prev);
   btnNext.addEventListener('click', next);
   lb.addEventListener('click', e => { if (e.target === lb) closeLb(); });
+  const lbControls = [btnClose, btnPrev, btnNext, btnInfo];
   window.addEventListener('keydown', e => {
     if (!lb.classList.contains('open')) return;
-    if (e.key === 'Escape') closeLb();
+    if (e.key === 'Tab') {
+      const focusables = lbControls.filter(el => el && el.offsetParent !== null);
+      if (!focusables.length) return;
+      const first = focusables[0];
+      const last = focusables[focusables.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    } else if (e.key === 'Escape') closeLb();
     else if (e.key === 'ArrowLeft') prev();
     else if (e.key === 'ArrowRight') next();
     else if (e.key && e.key.toLowerCase() === 'i') { e.preventDefault(); toggleExif(); }
   });
   // EXIF panel
-  const btnInfo = document.getElementById('btnInfo');
-  const exifPanel = document.getElementById('exifPanel');
-
   function renderExif(d, item){
     if (!exifPanel) return;
     // SECURITY: Use safe DOM methods and textContent to prevent DOM XSS from image filenames or EXIF metadata
@@ -2593,7 +2641,11 @@ syncBtn?.addEventListener('click', (e)=>{
     g.append(sizeKey, sizeValue);
     exifPanel.append(h, g);
   }
-  function toggleExif(){ exifPanel?.classList.toggle('open'); }
+  function toggleExif(){
+    if (!exifPanel) return;
+    const isOpen = exifPanel.classList.toggle('open');
+    btnInfo?.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+  }
   btnInfo?.addEventListener('click', (e)=>{ e.preventDefault(); toggleExif(); });
 
   // === Generazione asincrona GIF per cartelle ===
