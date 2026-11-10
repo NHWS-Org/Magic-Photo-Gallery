@@ -310,9 +310,10 @@ function img_dims($path) {
 function rel($abs) {
     // Converte un path assoluto del filesystem in path URL relativo alla directory dello script
     $abs = str_replace('\\', '/', $abs);
-    $baseFs = str_replace('\\', '/', realpath($GLOBALS['baseDir']));
+    $baseFs = rtrim(str_replace('\\', '/', realpath($GLOBALS['baseDir'])), '/');
     $baseUrl = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? '/')), '/');
-    if (strpos($abs, $baseFs) === 0) {
+    // SECURITY: Enforce strict boundary matching to prevent prefix confusion with sibling paths
+    if ($abs === $baseFs || strpos($abs, $baseFs . '/') === 0) {
         $suffix = ltrim(substr($abs, strlen($baseFs)), '/');
         // Se lo script è in root, non aggiungere doppio slash
         if ($baseUrl === '' || $baseUrl === '/') {
@@ -354,8 +355,9 @@ $reqDir = ltrim($reqDir, '/');
 // blocca risalite
 if (strpos($reqDir, '..') !== false) { $reqDir = ''; }
 $currentAbs = realpath($baseDir . ($reqDir ? '/' . $reqDir : '')) ?: $baseDir;
-// Enforce sotto-albero
-if (strpos($currentAbs, realpath($baseDir)) !== 0) { $currentAbs = $baseDir; $reqDir = ''; }
+// SECURITY: Enforce subtree boundary with trailing separator to prevent path prefix confusion (e.g. /app vs /app_secret)
+$realBaseDir = rtrim(realpath($baseDir), DIRECTORY_SEPARATOR);
+if ($currentAbs !== $realBaseDir && strpos($currentAbs, $realBaseDir . DIRECTORY_SEPARATOR) !== 0) { $currentAbs = $baseDir; $reqDir = ''; }
 $relDir = trim(str_replace(realpath($baseDir), '', $currentAbs), DIRECTORY_SEPARATOR);
 $relDir = str_replace(DIRECTORY_SEPARATOR, '/', $relDir);
 // blocca l'accesso a cartelle escluse
@@ -390,10 +392,9 @@ function folder_gif_progress_path($dirRel, $thumbsRoot, $prefThumb) {
     return $dir . DIRECTORY_SEPARATOR . $prefThumb . $safe . '.json';
 }
 
-// helper: verifica se una cartella va esclusa
+// SECURITY: Helper per verificare se una cartella o percorso va escluso (inclusi segmenti antenati e cartelle nascoste)
 function is_excluded_dir($entryName, $relativePath = '') {
     global $cfg;
-    // escludi sempre cartelle che iniziano con punto
     if ($entryName === '' || $entryName[0] === '.') return true;
     // SECURITY: Ensure no segment in relative path is hidden or inside an excluded directory to prevent path traversal bypasses
     $rel = str_replace(['\\'], '/', trim($relativePath, '/'));
@@ -890,7 +891,8 @@ if (isset($_GET['make_gif'])) {
     $dirRel = trim(str_replace(['\\'],'/', ltrim($_GET['make_gif'],'/')));
     if (strpos($dirRel,'..') !== false) { echo json_encode(['ok'=>false]); exit; }
     $srcAbs = realpath($baseDir . ($dirRel ? '/' . $dirRel : '')) ?: $baseDir;
-    if (strpos($srcAbs, realpath($baseDir)) !== 0) { echo json_encode(['ok'=>false]); exit; }
+    // SECURITY: Enforce directory boundary with trailing separator to prevent prefix confusion
+    if ($srcAbs !== $realBaseDir && strpos($srcAbs, $realBaseDir . DIRECTORY_SEPARATOR) !== 0) { echo json_encode(['ok'=>false]); exit; }
     // rifiuta se il target è escluso
     if ($dirRel !== '') {
         $last = basename($dirRel);
