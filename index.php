@@ -1923,6 +1923,10 @@ button { all:unset; }
   .menu-btn{ background:rgba(0,0,0,.06); color:inherit; border-color:rgba(0,0,0,.12); }
 }
 .menu-btn .ic{ font-size:16px; line-height:1; }
+.menu-btn:focus-visible{
+  outline: 2px solid #2a6fef;
+  outline-offset: 2px;
+}
 .menu-list{
   position:absolute; top:calc(100% + 8px); right:0; min-width:220px;
   background:rgba(22,22,22,.96); color:#fff; border:1px solid rgba(255,255,255,.18);
@@ -1938,6 +1942,10 @@ button { all:unset; }
   border-radius:10px; text-decoration:none; color:inherit; white-space:nowrap;
 }
 .menu-item:hover{ background:rgba(255,255,255,.10); }
+.menu-item:focus-visible{
+  outline: 2px solid #2a6fef;
+  outline-offset: -2px;
+}
 @media (prefers-color-scheme: light){
   .menu-item:hover{ background:rgba(0,0,0,.06); }
 }
@@ -2328,15 +2336,32 @@ button { all:unset; }
   // Dropdown menu
   const menu = document.getElementById('userMenu');
   const menuToggle = document.getElementById('menuToggle');
-  function closeMenu(){ menu?.classList.remove('open'); menuToggle?.setAttribute('aria-expanded','false'); }
+  function closeMenu({ restoreFocus = false } = {}){
+    if (!menu) return;
+    const wasOpen = menu.classList.contains('open');
+    menu.classList.remove('open');
+    menuToggle?.setAttribute('aria-expanded', 'false');
+    if (wasOpen && restoreFocus) menuToggle?.focus();
+  }
   function toggleMenu(){ 
     if (!menu) return;
     const open = menu.classList.toggle('open');
     menuToggle?.setAttribute('aria-expanded', open ? 'true' : 'false');
+    if (open) {
+      const firstItem = menu.querySelector('.menu-list a.menu-item, .menu-list select');
+      firstItem?.focus();
+    }
   }
   menuToggle?.addEventListener('click', (e)=>{ e.preventDefault(); e.stopPropagation(); toggleMenu(); });
   document.addEventListener('click', (e)=>{ if (!menu?.contains(e.target)) closeMenu(); });
-  document.addEventListener('keydown', (e)=>{ if (e.key === 'Escape') closeMenu(); });
+  menu?.addEventListener('focusout', (e)=>{
+    if (!menu.contains(e.relatedTarget)) closeMenu();
+  });
+  document.addEventListener('keydown', (e)=>{
+    if (e.key === 'Escape' && menu?.classList.contains('open')) {
+      closeMenu({ restoreFocus: true });
+    }
+  });
 
   // Purge cache corrente (ricorsivo dalla root)
   const purgeBtn = document.getElementById('purgeBtn');
