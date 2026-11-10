@@ -2354,14 +2354,14 @@ button { all:unset; }
   }
   menuToggle?.addEventListener('click', (e)=>{ e.preventDefault(); e.stopPropagation(); toggleMenu(); });
   document.addEventListener('click', (e)=>{ if (!menu?.contains(e.target)) closeMenu(); });
-  menu?.addEventListener('focusout', ()=>{
-    setTimeout(()=>{
-      if (!menu.contains(document.activeElement)) closeMenu();
-    }, 0);
-  });
   document.addEventListener('keydown', (e)=>{
-    if (e.key === 'Escape' && menu?.classList.contains('open')) {
+    if (!menu?.classList.contains('open')) return;
+    if (e.key === 'Escape') {
       closeMenu({ restoreFocus: true });
+    } else if (e.key === 'Tab') {
+      setTimeout(()=>{
+        if (!menu.contains(document.activeElement)) closeMenu();
+      }, 0);
     }
   });
 
