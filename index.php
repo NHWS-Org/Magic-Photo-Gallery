@@ -2354,8 +2354,10 @@ button { all:unset; }
   }
   menuToggle?.addEventListener('click', (e)=>{ e.preventDefault(); e.stopPropagation(); toggleMenu(); });
   document.addEventListener('click', (e)=>{ if (!menu?.contains(e.target)) closeMenu(); });
-  menu?.addEventListener('focusout', (e)=>{
-    if (!menu.contains(e.relatedTarget)) closeMenu();
+  menu?.addEventListener('focusout', ()=>{
+    setTimeout(()=>{
+      if (!menu.contains(document.activeElement)) closeMenu();
+    }, 0);
   });
   document.addEventListener('keydown', (e)=>{
     if (e.key === 'Escape' && menu?.classList.contains('open')) {
