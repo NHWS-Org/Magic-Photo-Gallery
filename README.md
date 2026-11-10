@@ -9,6 +9,8 @@ Just simply use my [docker image](https://github.com/napalmz/httpd-base), as sho
 
 ![Magic Photo Gallery screenshot](./screenshot.png)
 
+Interface icons use monochrome, Material Design-inspired inline SVGs, with no external fonts or icon downloads. They inherit the surrounding text color; authentication indicators remain green (unlocked) or red (locked).
+
 ## Languages
 
 The UI is translated into 32 European languages (en, it, fr, de, es, pt, nl, pl, ro, cs, sk, sl, hr, bg, el, hu, fi, sv, da, no, is, et, lv, lt, ga, mt, ca, uk, ru, sr, sq, mk).

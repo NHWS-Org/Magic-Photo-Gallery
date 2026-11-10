@@ -1527,6 +1527,33 @@ if (isset($_GET['sync_cache'])) {
     exit;
 }
 
+function mpg_icon(string $name): string {
+    static $shapes = [
+        'home' => '<path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1z"/>',
+        'menu' => '<path d="M3 6h18M3 12h18M3 18h18"/>',
+        'delete' => '<path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7"/>',
+        'sync' => '<path d="M20 7a9 9 0 0 0-15-1L3 8m0-5v5h5M4 17a9 9 0 0 0 15 1l2-2m0 5v-5h-5"/>',
+        'key' => '<circle cx="7" cy="12" r="4"/><path d="M11 12h10M17 12v4M21 12v3"/>',
+        'login' => '<path d="M14 3h7v18h-7M3 12h13m-5-5 5 5-5 5"/>',
+        'logout' => '<path d="M10 3H3v18h7M8 12h13m-5-5 5 5-5 5"/>',
+        'language' => '<circle cx="12" cy="12" r="9"/><ellipse cx="12" cy="12" rx="4" ry="9"/><path d="M3 12h18"/>',
+        'folder' => '<path d="M3 5h6l2 2h10v13H3z"/>',
+        'photo' => '<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8" cy="8" r="1"/><path d="m3 17 5-5 4 4 4-6 5 7"/>',
+        'chevron-right' => '<path d="m9 6 6 6-6 6"/>',
+        'chevron-left' => '<path d="m15 6-6 6 6 6"/>',
+        'expand' => '<path d="m6 9 6 6 6-6"/>',
+        'close' => '<path d="m6 6 12 12M6 18 18 6"/>',
+        'info' => '<circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7h.01"/>',
+        'unlocked' => '<rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V6a4 4 0 0 1 7.5-2"/>',
+        'locked' => '<rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/>'
+    ];
+    if (!isset($shapes[$name])) {
+        throw new InvalidArgumentException('Unknown gallery icon: ' . $name);
+    }
+    return '<svg xmlns="http://www.w3.org/2000/svg" class="ic" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">'
+        . $shapes[$name] . '</svg>';
+}
+
 // === SCANSIONE: sottocartelle e file immagini nella cartella corrente ===
 // Performance optimization (Bolt ⚡):
 // 1. Collect subdirectories and image files in a single pass of $currentAbs instead of scanning twice.
@@ -1563,33 +1590,8 @@ foreach ($dIt as $entry) {
         // Placeholder SVG per "cartella annidata" quando non ci sono foto ma ci sono sottocartelle
         $placeholder = null;
         if (!file_exists($gifAbs) && $imgCount === 0 && $dirCount > 0) {
-            $svg = '<?xml version="1.0" encoding="UTF-8"?>'
-                 . '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 150" preserveAspectRatio="xMidYMid slice">'
-                 . '<defs>'
-                 . '  <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">'
-                 . '    <stop offset="0" stop-color="#eef1f5"/><stop offset="1" stop-color="#e3e6ea"/>'
-                 . '  </linearGradient>'
-                 . '  <linearGradient id="folder" x1="0" y1="0" x2="0" y2="1">'
-                 . '    <stop offset="0" stop-color="#ffd36b"/><stop offset="1" stop-color="#f0b548"/>'
-                 . '  </linearGradient>'
-                 . '  <filter id="soft" x="-10%" y="-10%" width="120%" height="120%"><feGaussianBlur in="SourceAlpha" stdDeviation="2"/><feOffset dy="1"/><feComponentTransfer><feFuncA type="linear" slope="0.35"/></feComponentTransfer><feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge></filter>'
-                 . '</defs>'
-                 . '<rect width="200" height="150" rx="16" fill="url(#bg)"/>'
-                 . '<g transform="translate(20,36)" filter="url(#soft)">'
-                 . '  <!-- linguetta -->'
-                 . '  <path d="M18 6h32c6 0 10 2 13 6l5 6h78a12 12 0 0 1 12 12v48a12 12 0 0 1-12 12H12A12 12 0 0 1 0 78V18A12 12 0 0 1 12 6z" fill="url(#folder)" stroke="#d39f43" stroke-width="1"/>'
-                 . '  <!-- documenti stilizzati -->'
-                 . '  <g opacity=".9" transform="translate(24,28)">'
-                 . '    <rect x="0" y="8" width="50" height="34" rx="6" fill="#fff" stroke="#d9d9d9"/>'
-                 . '    <rect x="10" y="0" width="60" height="38" rx="6" fill="#fff" stroke="#d9d9d9"/>'
-                 . '  </g>'
-                 . '  <!-- indice cartelle -->'
-                 . '  <g opacity=".8" transform="translate(110,24)">'
-                 . '    <rect x="0" y="0" width="48" height="30" rx="6" fill="#fff" stroke="#d9d9d9"/>'
-                 . '    <path d="M12 9h24M12 15h24M12 21h24" stroke="#a0a0a0" stroke-width="3" stroke-linecap="round"/>'
-                 . '  </g>'
-                 . '</g>'
-                 . '</svg>';
+            $svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" color="#9ca3af">'
+                 . '<g transform="translate(12 12)">' . mpg_icon('folder') . '</g></svg>';
             $placeholder = 'data:image/svg+xml;base64,' . base64_encode($svg);
         }
         $subdirs[] = [
@@ -1660,6 +1662,7 @@ $folderSortLabels = $LANG === 'it'
   }
 }
 body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background: var(--bg); color: var(--fg); }
+.ic { width:20px; height:20px; display:inline-block; flex-shrink:0; vertical-align:middle; pointer-events:none; }
 header { padding: 12px 16px; font-weight: 600; }
 .hdr {
   display:grid;
@@ -1672,7 +1675,7 @@ header { padding: 12px 16px; font-weight: 600; }
   text-align:center;
   font-weight:700;
 }
-.crumbs a { color: inherit; text-decoration: none; }
+.crumbs a { color: inherit; text-decoration: none; display:inline-flex; align-items:center; gap:6px; }
 .crumbs { font-weight:600; display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
 
 /* Responsive: su schermi stretti: titolo in alto a sinistra, menu in alto a destra, breadcrumbs sotto a sinistra */
@@ -1736,6 +1739,8 @@ header { padding: 12px 16px; font-weight: 600; }
   gap:4px;
 }
 #foldersToggle:hover { opacity:0.85; }
+#foldersCaret { display:inline-flex; }
+#foldersToggle[aria-expanded="false"] #foldersCaret { transform:rotate(-90deg); }
 #foldersToggle:focus-visible {
   outline: 2px solid #2a6fef;
   outline-offset: 2px;
@@ -1806,10 +1811,12 @@ header { padding: 12px 16px; font-weight: 600; }
   position:absolute; top:8px; left:8px; display:flex; gap:6px; z-index:2;
 }
 .badge{
+  display:inline-flex; align-items:center; gap:4px;
   font-size:12px; line-height:1; padding:4px 6px; border-radius:999px;
   background:rgba(0,0,0,.55); color:#fff; text-shadow:0 1px 1px rgba(0,0,0,.5);
   backdrop-filter:saturate(120%) blur(2px);
 }
+.badge .ic{ width:16px; height:16px; }
 .card img { display:block; width:100%; height:100%; object-fit:cover; transition:transform .2s ease; background: transparent; }
 .card:hover img { transform: scale(1.03); }
 .name{
@@ -1850,6 +1857,7 @@ header { padding: 12px 16px; font-weight: 600; }
     -webkit-filter: brightness(0.78);
   }
 }
+#folders .card img.folder-placeholder{ filter:none; -webkit-filter:none; }
 
 /* Disable scale hover on folder GIFs */
 #folders .card:hover img{ transform:none; }
@@ -1893,6 +1901,7 @@ header { padding: 12px 16px; font-weight: 600; }
   color:#fff; width:44px; height:44px; border-radius:50%;
   display:grid; place-items:center; cursor:pointer; user-select:none; }
 .close { top:24px; right:24px; transform:none; }
+.lightbox .ic{ width:24px; height:24px; }
 .nav.prev { left:18px; }
 .nav.next { right:18px; }
 .counter { position:absolute; bottom:16px; left:50%; transform:translateX(-50%); font-size:14px; color:#bbb; }
@@ -1922,7 +1931,6 @@ button { all:unset; }
 @media (prefers-color-scheme: light){
   .menu-btn{ background:rgba(0,0,0,.06); color:inherit; border-color:rgba(0,0,0,.12); }
 }
-.menu-btn .ic{ font-size:16px; line-height:1; }
 .menu-btn:focus-visible{
   outline: 2px solid #2a6fef;
   outline-offset: 2px;
@@ -1956,7 +1964,6 @@ button { all:unset; }
   gap:6px; padding:6px 8px; border-radius:8px; line-height:1;
   font-size:16px; user-select:none; margin-right:8px;
 }
-.auth-ind svg{ width:20px; height:20px; display:block; }
 .auth-ind.unlocked{ color:#15a34a; } /* green */
 .auth-ind.locked{ color:#dc2626; }   /* red */
 @media (prefers-color-scheme: light){
@@ -2029,14 +2036,14 @@ button { all:unset; }
 <header>
   <div class="hdr">
     <nav class="crumbs" aria-label="Breadcrumb">
-      <a href="<?php echo htmlspecialchars($self,ENT_QUOTES); ?>" title="<?php echo htmlspecialchars(t('home'),ENT_QUOTES); ?>">🏠 <?php echo htmlspecialchars(t('home'),ENT_QUOTES); ?></a>
+      <a href="<?php echo htmlspecialchars($self,ENT_QUOTES); ?>" title="<?php echo htmlspecialchars(t('home'),ENT_QUOTES); ?>"><?php echo mpg_icon('home'); ?> <?php echo htmlspecialchars(t('home'),ENT_QUOTES); ?></a>
       <?php
         if (!$isRoot) {
           $acc = '';
           foreach (explode('/', $relDir) as $i => $seg) {
             $acc = ltrim($acc . '/' . $seg, '/');
             if (is_excluded_dir($seg, $acc)) break;
-            echo '<span class="sep">›</span><a href="'.$self.'?dir='.rawurlencode($acc).'">'.htmlspecialchars($seg,ENT_QUOTES).'</a>';
+            echo '<span class="sep">' . mpg_icon('chevron-right') . '</span><a href="'.$self.'?dir='.rawurlencode($acc).'">'.htmlspecialchars($seg,ENT_QUOTES).'</a>';
           }
         }
       ?>
@@ -2047,58 +2054,48 @@ button { all:unset; }
         <?php if ((int)$cfg['auth_mode'] === 1): ?>
           <div class="auth-ind <?php echo auth_ok() ? 'unlocked' : 'locked'; ?>" role="status" aria-live="polite"
                title="<?php echo htmlspecialchars(auth_ok() ? t('auth_extra') : t('auth_no'),ENT_QUOTES); ?>">
-            <?php if (auth_ok()): ?>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <rect x="4" y="10" width="16" height="11" rx="2"/>
-                <path d="M8 10V6a4 4 0 0 1 7.5-2"/>
-              </svg>
-            <?php else: ?>
-              🔒
-            <?php endif; ?>
+            <?php echo mpg_icon(auth_ok() ? 'unlocked' : 'locked'); ?>
           </div>
         <?php elseif ((int)$cfg['auth_mode'] === 2 && auth_ok()): ?>
           <div class="auth-ind unlocked" role="status" aria-live="polite" title="<?php echo htmlspecialchars(t('auth_in'),ENT_QUOTES); ?>">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <rect x="4" y="10" width="16" height="11" rx="2"/>
-              <path d="M8 10V6a4 4 0 0 1 7.5-2"/>
-            </svg>
+            <?php echo mpg_icon('unlocked'); ?>
           </div>
         <?php endif; ?>
         <button class="menu-btn" id="menuToggle" aria-haspopup="true" aria-expanded="false">
-          <span class="ic">☰</span><span><?php echo htmlspecialchars(t('menu'),ENT_QUOTES); ?></span>
+          <?php echo mpg_icon('menu'); ?><span><?php echo htmlspecialchars(t('menu'),ENT_QUOTES); ?></span>
         </button>
       </div>
       <div class="menu-list" role="menu" aria-label="<?php echo htmlspecialchars(t('menu'),ENT_QUOTES); ?>">
         <?php if ((int)$cfg['auth_mode'] === 0): ?>
           <a href="#" id="purgeBtn" class="menu-item" role="menuitem" title="<?php echo htmlspecialchars(t('purge_t'),ENT_QUOTES); ?>">
-            <span class="ic">🧹</span><span><?php echo htmlspecialchars(t('purge'),ENT_QUOTES); ?></span>
+            <?php echo mpg_icon('delete'); ?><span><?php echo htmlspecialchars(t('purge'),ENT_QUOTES); ?></span>
           </a>
           <a href="#" id="syncBtn" class="menu-item" role="menuitem" title="<?php echo htmlspecialchars(t('sync_t'),ENT_QUOTES); ?>">
-            <span class="ic">🔄</span><span><?php echo htmlspecialchars(t('sync'),ENT_QUOTES); ?></span>
+            <?php echo mpg_icon('sync'); ?><span><?php echo htmlspecialchars(t('sync'),ENT_QUOTES); ?></span>
           </a>
         <?php elseif ((int)$cfg['auth_mode'] >= 1 && auth_ok()): ?>
           <a href="#" id="purgeBtn" class="menu-item" role="menuitem" title="<?php echo htmlspecialchars(t('purge_t'),ENT_QUOTES); ?>">
-            <span class="ic">🧹</span><span><?php echo htmlspecialchars(t('purge'),ENT_QUOTES); ?></span>
+            <?php echo mpg_icon('delete'); ?><span><?php echo htmlspecialchars(t('purge'),ENT_QUOTES); ?></span>
           </a>
           <a href="#" id="syncBtn" class="menu-item" role="menuitem" title="<?php echo htmlspecialchars(t('sync_t'),ENT_QUOTES); ?>">
-            <span class="ic">🔄</span><span><?php echo htmlspecialchars(t('sync'),ENT_QUOTES); ?></span>
+            <?php echo mpg_icon('sync'); ?><span><?php echo htmlspecialchars(t('sync'),ENT_QUOTES); ?></span>
           </a>
           <a href="#" id="mkHash" class="menu-item" role="menuitem">
-            <span class="ic">🔐</span><span><?php echo htmlspecialchars(t('mkhash'),ENT_QUOTES); ?></span>
+            <?php echo mpg_icon('key'); ?><span><?php echo htmlspecialchars(t('mkhash'),ENT_QUOTES); ?></span>
           </a>
           <div class="menu-sep" aria-hidden="true"></div>
           <a href="?logout=1" class="menu-item" role="menuitem">
-            <span class="ic">🚪</span><span><?php echo htmlspecialchars(t('logout'),ENT_QUOTES); ?></span>
+            <?php echo mpg_icon('logout'); ?><span><?php echo htmlspecialchars(t('logout'),ENT_QUOTES); ?></span>
           </a>
         <?php elseif ((int)$cfg['auth_mode'] >= 1 && !auth_ok()): ?>
           <a href="#" id="btnLogin" class="menu-item" role="menuitem">
-            <span class="ic">🔑</span><span><?php echo htmlspecialchars(t('login'),ENT_QUOTES); ?></span>
+            <?php echo mpg_icon('login'); ?><span><?php echo htmlspecialchars(t('login'),ENT_QUOTES); ?></span>
           </a>
         <?php endif; ?>
         <?php if ((int)$cfg['auth_mode'] === 0 || auth_ok()): ?>
           <div class="menu-sep" aria-hidden="true"></div>
           <label class="menu-item" for="langSel">
-            <span class="ic">🌐</span><span><?php echo htmlspecialchars(t('language'),ENT_QUOTES); ?></span>
+            <?php echo mpg_icon('language'); ?><span><?php echo htmlspecialchars(t('language'),ENT_QUOTES); ?></span>
             <select id="langSel" aria-label="<?php echo htmlspecialchars(t('language'),ENT_QUOTES); ?>" style="margin-left:auto;max-width:160px;">
               <option value="auto"<?php echo $cfg['language'] === 'auto' ? ' selected' : ''; ?>><?php echo htmlspecialchars(t('auto'),ENT_QUOTES); ?></option>
               <?php foreach (mpg_lang_langs() as $lc => $ln): ?>
@@ -2129,7 +2126,7 @@ button { all:unset; }
 <section style="padding:0 var(--gap);">
   <div class="folders-heading">
     <h3 id="foldersToggle" role="button" tabindex="0" aria-expanded="true" aria-controls="folders" style="cursor:pointer; user-select:none;">
-      <span id="foldersCaret" aria-hidden="true">▾</span> <?php echo htmlspecialchars(t('folders'),ENT_QUOTES); ?>
+      <span id="foldersCaret" aria-hidden="true"><?php echo mpg_icon('expand'); ?></span> <?php echo htmlspecialchars(t('folders'),ENT_QUOTES); ?>
     </h3>
     <label for="folderSort"><?php echo htmlspecialchars($folderSortLabels['sort'],ENT_QUOTES); ?>
       <select id="folderSort">
@@ -2143,13 +2140,14 @@ button { all:unset; }
     <?php foreach ($subdirs as $sd): ?>
       <a class="card" href="<?php echo htmlspecialchars($self,ENT_QUOTES); ?>?dir=<?php echo rawurlencode($sd['rel']); ?>" data-rel="<?php echo htmlspecialchars($sd['rel'],ENT_QUOTES); ?>" data-has-imgs="<?php echo ($sd['imgs']>0)?'1':'0'; ?>" data-imgs="<?php echo (int)$sd['imgs']; ?>" data-size="<?php echo (int)$sd['size']; ?>" data-name="<?php echo htmlspecialchars($sd['name'],ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); ?>" style="display:block; text-decoration:none; color:inherit;">
         <img
+          class="<?php echo $sd['placeholder'] ? 'folder-placeholder' : ''; ?>"
           src="<?php echo $sd['gif'] ? htmlspecialchars($sd['gif'],ENT_QUOTES) : ($sd['placeholder'] ? $sd['placeholder'] : 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw=='); ?>"
           alt="<?php echo htmlspecialchars($sd['name'],ENT_QUOTES); ?>"
           data-gif="<?php echo htmlspecialchars($sd['gif'] ?? '',ENT_QUOTES); ?>"
           loading="lazy" decoding="async">
         <div class="badges">
-          <?php if ($sd['dirs'] > 0): ?><span class="badge" title="<?php echo htmlspecialchars(t('folders'),ENT_QUOTES); ?>">📁 <?php echo (int)$sd['dirs']; ?></span><?php endif; ?>
-          <?php if ($sd['imgs'] > 0): ?><span class="badge" title="<?php echo htmlspecialchars(t('photos'),ENT_QUOTES); ?>">🖼 <?php echo (int)$sd['imgs']; ?></span><?php endif; ?>
+          <?php if ($sd['dirs'] > 0): ?><span class="badge" title="<?php echo htmlspecialchars(t('folders'),ENT_QUOTES); ?>"><?php echo mpg_icon('folder'); ?> <?php echo (int)$sd['dirs']; ?></span><?php endif; ?>
+          <?php if ($sd['imgs'] > 0): ?><span class="badge" title="<?php echo htmlspecialchars(t('photos'),ENT_QUOTES); ?>"><?php echo mpg_icon('photo'); ?> <?php echo (int)$sd['imgs']; ?></span><?php endif; ?>
         </div>
         <div class="name" title="<?php echo htmlspecialchars($sd['name'],ENT_QUOTES); ?>"><?php echo htmlspecialchars($sd['name'],ENT_QUOTES); ?></div>
         <div class="progress"><span></span></div>
@@ -2194,11 +2192,11 @@ button { all:unset; }
 
 <div class="lightbox" id="lightbox" role="dialog" aria-modal="true" aria-label="<?php echo htmlspecialchars(t('viewer'),ENT_QUOTES); ?>" aria-hidden="true">
   <div class="spinner" id="spinner" aria-hidden="true"></div>
-  <button class="close" id="btnClose" title="<?php echo htmlspecialchars(t('close'),ENT_QUOTES); ?>" aria-label="<?php echo htmlspecialchars(t('close'),ENT_QUOTES); ?>">✕</button>
-  <button class="nav prev" id="btnPrev" title="<?php echo htmlspecialchars(t('prev'),ENT_QUOTES); ?>" aria-label="<?php echo htmlspecialchars(t('prev'),ENT_QUOTES); ?>">❮</button>
+  <button class="close" id="btnClose" title="<?php echo htmlspecialchars(t('close'),ENT_QUOTES); ?>" aria-label="<?php echo htmlspecialchars(t('close'),ENT_QUOTES); ?>"><?php echo mpg_icon('close'); ?></button>
+  <button class="nav prev" id="btnPrev" title="<?php echo htmlspecialchars(t('prev'),ENT_QUOTES); ?>" aria-label="<?php echo htmlspecialchars(t('prev'),ENT_QUOTES); ?>"><?php echo mpg_icon('chevron-left'); ?></button>
   <div class="lb-img-wrap"><img id="lbImg" alt=""></div>
-  <button class="nav next" id="btnNext" title="<?php echo htmlspecialchars(t('next'),ENT_QUOTES); ?>" aria-label="<?php echo htmlspecialchars(t('next'),ENT_QUOTES); ?>">❯</button>
-  <button class="info" id="btnInfo" title="<?php echo htmlspecialchars(t('info'),ENT_QUOTES); ?>" aria-label="<?php echo htmlspecialchars(t('info'),ENT_QUOTES); ?>" aria-controls="exifPanel" aria-expanded="false">ℹ︎</button>
+  <button class="nav next" id="btnNext" title="<?php echo htmlspecialchars(t('next'),ENT_QUOTES); ?>" aria-label="<?php echo htmlspecialchars(t('next'),ENT_QUOTES); ?>"><?php echo mpg_icon('chevron-right'); ?></button>
+  <button class="info" id="btnInfo" title="<?php echo htmlspecialchars(t('info'),ENT_QUOTES); ?>" aria-label="<?php echo htmlspecialchars(t('info'),ENT_QUOTES); ?>" aria-controls="exifPanel" aria-expanded="false"><?php echo mpg_icon('info'); ?></button>
   <div class="exif" id="exifPanel" aria-live="polite"></div>
   <div class="counter" id="counter"></div>
 </div>
@@ -2442,19 +2440,16 @@ syncBtn?.addEventListener('click', (e)=>{
 
   // Collassa/espandi “Cartelle”
   const toggle = document.getElementById('foldersToggle');
-  const caret  = document.getElementById('foldersCaret');
   const keyColl = `mpg_fc_${window.__CUR_DIR__ || ''}`;
   function applyFoldState(){
     const st = localStorage.getItem(keyColl) || 'open';
     const isClosed = st === 'closed';
-    if (isClosed){ folders?.classList.add('collapsed'); if(caret) caret.textContent='▸'; }
-    else { folders?.classList.remove('collapsed'); if(caret) caret.textContent='▾'; }
+    folders?.classList.toggle('collapsed', isClosed);
     toggle?.setAttribute('aria-expanded', isClosed ? 'false' : 'true');
   }
   function toggleFolders(){
     folders?.classList.toggle('collapsed');
     const closed = Boolean(folders && folders.classList.contains('collapsed'));
-    if (caret) caret.textContent = closed ? '▸' : '▾';
     toggle?.setAttribute('aria-expanded', closed ? 'false' : 'true');
     localStorage.setItem(keyColl, closed ? 'closed' : 'open');
   }
