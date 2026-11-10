@@ -2158,12 +2158,12 @@ button { all:unset; }
 </div>
 
 <!-- Modal login per auth_mode >= 1 -->
-<div id="loginModal" style="position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.55);z-index:10000;">
+<div id="loginModal" role="dialog" aria-modal="true" aria-labelledby="loginTitle" aria-hidden="true" style="position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.55);z-index:10000;">
   <div style="background:#1b1b1b;color:#fff;border:1px solid rgba(255,255,255,.2);border-radius:12px;box-shadow:0 12px 32px rgba(0,0,0,.5);padding:16px;min-width:280px;max-width:90vw;">
-    <div style="font-weight:700;margin-bottom:10px;"><?php echo htmlspecialchars(t('login_required'),ENT_QUOTES); ?></div>
+    <div id="loginTitle" style="font-weight:700;margin-bottom:10px;"><?php echo htmlspecialchars(t('login_required'),ENT_QUOTES); ?></div>
     <label for="loginPass" style="font-size:12px;opacity:.8;"><?php echo htmlspecialchars(t('password'),ENT_QUOTES); ?></label>
     <input id="loginPass" type="password" placeholder="<?php echo htmlspecialchars(t('password'),ENT_QUOTES); ?>" style="width:100%;padding:10px 12px;margin-top:6px;border-radius:8px;border:1px solid #333;background:#0f0f0f;color:#fff;" autocomplete="current-password" autocapitalize="none" autocorrect="off" spellcheck="false" inputmode="text">
-    <div id="loginErr" style="height:14px;color:#ffb3b3;font-size:12px;margin-top:6px;"></div>
+    <div id="loginErr" style="height:14px;color:#ffb3b3;font-size:12px;margin-top:6px;" aria-live="polite"></div>
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px;">
       <button id="loginCancel" style="padding:8px 10px;border-radius:8px;border:1px solid #333;background:#222;color:#fff;cursor:pointer;"><?php echo htmlspecialchars(t('cancel'),ENT_QUOTES); ?></button>
       <button id="loginSubmit" style="padding:8px 10px;border-radius:8px;border:1px solid #333;background:#2a6fef;color:#fff;cursor:pointer;"><?php echo htmlspecialchars(t('login'),ENT_QUOTES); ?></button>
@@ -2399,25 +2399,52 @@ syncBtn?.addEventListener('click', (e)=>{
   const loginSubmit= document.getElementById('loginSubmit');
   const loginCancel= document.getElementById('loginCancel');
   const loginErr   = document.getElementById('loginErr');
+  let lastLoginFocused = null;
 
   function openLogin(){
     if (!loginModal) return;
+    lastLoginFocused = document.activeElement;
     loginErr && (loginErr.textContent = '');
     loginPass && (loginPass.value = '');
     loginModal.style.display = 'flex';
+    loginModal.setAttribute('aria-hidden', 'false');
     setTimeout(()=>{ loginPass?.focus(); }, 0);
   }
   function closeLogin(){
     if (!loginModal) return;
     loginModal.style.display = 'none';
+    loginModal.setAttribute('aria-hidden', 'true');
+    const target = (lastLoginFocused && lastLoginFocused.offsetParent !== null) ? lastLoginFocused : menuToggle;
+    if (target && typeof target.focus === 'function') {
+      target.focus();
+    }
   }
   loginBtn?.addEventListener('click', (e)=>{
     e.preventDefault();
+    closeMenu();
     openLogin();
   });
   loginCancel?.addEventListener('click', (e)=>{ e.preventDefault(); closeLogin(); });
   loginModal?.addEventListener('click', (e)=>{ if (e.target === loginModal) closeLogin(); });
-  document.addEventListener('keydown', (e)=>{ if (e.key === 'Escape') closeLogin(); });
+  const loginFocusables = [loginPass, loginCancel, loginSubmit];
+  document.addEventListener('keydown', (e)=>{
+    if (!loginModal || loginModal.style.display !== 'flex') return;
+    if (e.key === 'Escape') {
+      closeLogin();
+    } else if (e.key === 'Tab') {
+      const active = loginFocusables.filter(el => el && el.offsetParent !== null);
+      if (!active.length) return;
+      const first = active[0];
+      const last = active[active.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    }
+  });
 
   function doLogin(){
     const pwd = (loginPass?.value || '').toString();
