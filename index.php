@@ -2209,7 +2209,10 @@ button { all:unset; }
   const sortFieldLabels = <?php echo json_encode(['date'=>$sortLabels['date_value'],'name'=>$sortLabels['name_value'],'size'=>$sortLabels['size_value']], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE); ?>;
   const grid = document.getElementById('grid');
   const sortSelect = document.getElementById('photoSort');
-  const sortEntries = grid ? items.map((item, index) => ({item, card: grid.children[index]})) : [];
+  const sortEntries = grid ? items.map((item, index) => {
+    const card = grid.children[index];
+    return {item, card, badge: card.querySelector('.photo-size')};
+  }) : [];
   const lb = document.getElementById('lightbox');
   const spinner = document.getElementById('spinner');
   const lbImg = document.getElementById('lbImg');
@@ -2245,11 +2248,15 @@ button { all:unset; }
       return difference === 0 ? naturalCompare(a.item.sortName, b.item.sortName) : difference * multiplier;
     });
     items.length = 0;
+    // Performance optimization (Bolt ⚡): Batch DOM re-ordering into a DocumentFragment.
+    // Replaces N individual live DOM mutations with a single atomic insertion to minimize reflows.
+    const fragment = document.createDocumentFragment();
     sorted.forEach((entry, index) => {
       items.push(entry.item);
       entry.card.dataset.idx = index;
-      grid.appendChild(entry.card);
+      fragment.appendChild(entry.card);
     });
+    grid.appendChild(fragment);
   }
   // Performance optimization (Bolt ⚡): Cache Intl.NumberFormat to avoid expensive re-instantiation on every file badge render (~40x faster)
   let fileSizeFormatter = null;
@@ -2268,10 +2275,9 @@ button { all:unset; }
   }
   function updateHoverValues() {
     const key = (sortSelect?.value || 'date-asc').split('-')[0];
-    sortEntries.forEach(({item, card}) => {
+    sortEntries.forEach(({item, card, badge}) => {
       const value = key === 'date' ? item.sortDateLabel : key === 'name' ? item.sortName : formatFileSize(item.sortSize);
       const label = `${sortFieldLabels[key]}: ${value}`;
-      const badge = card.querySelector('.photo-size');
       if (badge) badge.textContent = label;
       card.title = `${item.sortName} — ${label}`;
     });
@@ -2280,7 +2286,7 @@ button { all:unset; }
     const sortStorageKey = `mpg_sort_${window.__CUR_DIR__ || ''}`;
     const savedSort = localStorage.getItem(sortStorageKey);
     if (Array.from(sortSelect.options).some(option => option.value === savedSort)) sortSelect.value = savedSort;
-    applyPhotoSort(sortSelect.value);
+    if (sortSelect.value !== 'date-asc') applyPhotoSort(sortSelect.value);
     updateHoverValues();
     sortSelect.addEventListener('change', () => {
       localStorage.setItem(sortStorageKey, sortSelect.value);
@@ -2306,11 +2312,13 @@ button { all:unset; }
         }
         return difference * multiplier;
       });
-      sorted.forEach(card => folders.appendChild(card));
+      const fragment = document.createDocumentFragment();
+      sorted.forEach(card => fragment.appendChild(card));
+      folders.appendChild(fragment);
     }
     const savedFolderSort = localStorage.getItem(folderSortStorageKey);
     if (Array.from(folderSortSelect.options).some(option => option.value === savedFolderSort)) folderSortSelect.value = savedFolderSort;
-    applyFolderSort(folderSortSelect.value);
+    if (folderSortSelect.value !== 'name-asc') applyFolderSort(folderSortSelect.value);
     folderSortSelect.addEventListener('change', () => {
       localStorage.setItem(folderSortStorageKey, folderSortSelect.value);
       applyFolderSort(folderSortSelect.value);
