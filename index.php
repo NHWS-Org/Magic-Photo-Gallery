@@ -1956,6 +1956,7 @@ button { all:unset; }
   gap:6px; padding:6px 8px; border-radius:8px; line-height:1;
   font-size:16px; user-select:none; margin-right:8px;
 }
+.auth-ind svg{ width:20px; height:20px; display:block; }
 .auth-ind.unlocked{ color:#15a34a; } /* green */
 .auth-ind.locked{ color:#dc2626; }   /* red */
 @media (prefers-color-scheme: light){
@@ -2046,11 +2047,21 @@ button { all:unset; }
         <?php if ((int)$cfg['auth_mode'] === 1): ?>
           <div class="auth-ind <?php echo auth_ok() ? 'unlocked' : 'locked'; ?>" role="status" aria-live="polite"
                title="<?php echo htmlspecialchars(auth_ok() ? t('auth_extra') : t('auth_no'),ENT_QUOTES); ?>">
-            <?php echo auth_ok() ? '🔓' : '🔒'; ?>
+            <?php if (auth_ok()): ?>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <rect x="4" y="10" width="16" height="11" rx="2"/>
+                <path d="M8 10V6a4 4 0 0 1 7.5-2"/>
+              </svg>
+            <?php else: ?>
+              🔒
+            <?php endif; ?>
           </div>
         <?php elseif ((int)$cfg['auth_mode'] === 2 && auth_ok()): ?>
           <div class="auth-ind unlocked" role="status" aria-live="polite" title="<?php echo htmlspecialchars(t('auth_in'),ENT_QUOTES); ?>">
-            🔓
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="4" y="10" width="16" height="11" rx="2"/>
+              <path d="M8 10V6a4 4 0 0 1 7.5-2"/>
+            </svg>
           </div>
         <?php endif; ?>
         <button class="menu-btn" id="menuToggle" aria-haspopup="true" aria-expanded="false">
