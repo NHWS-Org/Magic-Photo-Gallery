@@ -8,6 +8,10 @@ if (!headers_sent()) {
     header('Permissions-Policy: camera=(), microphone=(), geolocation=()');
     // SECURITY: Isolate browsing context from cross-origin openers/popups (prevent XS-Leaks / Spectre-style window interactions)
     header('Cross-Origin-Opener-Policy: same-origin');
+    // SECURITY: Prevent other origins from loading gallery resources/thumbnails into cross-origin contexts (defense-in-depth against CORB/XS-Leaks)
+    header('Cross-Origin-Resource-Policy: same-origin');
+    // SECURITY: Restrict Adobe Flash/Acrobat cross-domain policy files from granting unauthorized domain access
+    header('X-Permitted-Cross-Domain-Policies: none');
 }
 
 // === CONFIGURAZIONE ===
