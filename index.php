@@ -310,9 +310,10 @@ function img_dims($path) {
 function rel($abs) {
     // Converte un path assoluto del filesystem in path URL relativo alla directory dello script
     $abs = str_replace('\\', '/', $abs);
-    $baseFs = str_replace('\\', '/', realpath($GLOBALS['baseDir']));
+    $baseFs = rtrim(str_replace('\\', '/', realpath($GLOBALS['baseDir'])), '/');
     $baseUrl = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? '/')), '/');
-    if (strpos($abs, $baseFs) === 0) {
+    // SECURITY: Enforce strict boundary matching to prevent prefix confusion with sibling paths
+    if ($abs === $baseFs || strpos($abs, $baseFs . '/') === 0) {
         $suffix = ltrim(substr($abs, strlen($baseFs)), '/');
         // Se lo script è in root, non aggiungere doppio slash
         if ($baseUrl === '' || $baseUrl === '/') {
@@ -354,8 +355,9 @@ $reqDir = ltrim($reqDir, '/');
 // blocca risalite
 if (strpos($reqDir, '..') !== false) { $reqDir = ''; }
 $currentAbs = realpath($baseDir . ($reqDir ? '/' . $reqDir : '')) ?: $baseDir;
-// Enforce sotto-albero
-if (strpos($currentAbs, realpath($baseDir)) !== 0) { $currentAbs = $baseDir; $reqDir = ''; }
+// SECURITY: Enforce subtree boundary with trailing separator to prevent path prefix confusion (e.g. /app vs /app_secret)
+$realBaseDir = rtrim(realpath($baseDir), DIRECTORY_SEPARATOR);
+if ($currentAbs !== $realBaseDir && strpos($currentAbs, $realBaseDir . DIRECTORY_SEPARATOR) !== 0) { $currentAbs = $baseDir; $reqDir = ''; }
 $relDir = trim(str_replace(realpath($baseDir), '', $currentAbs), DIRECTORY_SEPARATOR);
 $relDir = str_replace(DIRECTORY_SEPARATOR, '/', $relDir);
 // blocca l'accesso a cartelle escluse
@@ -390,17 +392,22 @@ function folder_gif_progress_path($dirRel, $thumbsRoot, $prefThumb) {
     return $dir . DIRECTORY_SEPARATOR . $prefThumb . $safe . '.json';
 }
 
-// helper: verifica se una cartella va esclusa
+// SECURITY: Helper per verificare se una cartella o percorso va escluso (inclusi segmenti antenati e cartelle nascoste)
 function is_excluded_dir($entryName, $relativePath = '') {
     global $cfg;
-    // escludi sempre cartelle che iniziano con punto
     if ($entryName === '' || $entryName[0] === '.') return true;
-    // confronta per nome semplice e per path relativo normalizzato
+    // SECURITY: Ensure no segment in relative path is hidden or inside an excluded directory to prevent path traversal bypasses
     $rel = str_replace(['\\'], '/', trim($relativePath, '/'));
+    if ($rel !== '') {
+        foreach (explode('/', $rel) as $seg) {
+            if ($seg === '' || $seg[0] === '.') return true;
+            foreach ($cfg['exclude_dirs'] as $e) {
+                if ($e !== '' && strcasecmp($seg, $e) === 0) return true;
+            }
+        }
+    }
     foreach ($cfg['exclude_dirs'] as $e) {
-        if ($e === '') continue;
-        if (strcasecmp($entryName, $e) === 0) return true;
-        if ($rel !== '' && strcasecmp($rel, $e) === 0) return true;
+        if ($e !== '' && strcasecmp($entryName, $e) === 0) return true;
     }
     return false;
 }
@@ -408,9 +415,18 @@ function is_excluded_dir($entryName, $relativePath = '') {
 // === ENDPOINT: genera hash per password ===
 if (isset($_GET['mkhash'])) {
     header('Content-Type: application/json; charset=utf-8');
+    header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+    header('Pragma: no-cache');
+    // SECURITY: Use POST and require CSRF token to prevent password leakage via URL query strings/logs and CSRF attacks
+    if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') { http_response_code(405); echo json_encode(['ok'=>false,'error'=>'method_not_allowed']); exit; }
     if ((int)$cfg['auth_mode'] === 0 || !auth_ok()) { http_response_code(401); echo json_encode(['ok'=>false,'error'=>'unauthorized']); exit; }
-    $plain = (string)($_GET['mkhash'] ?? '');
-    if ($plain === '') { echo json_encode(['ok'=>false,'error'=>'empty']); exit; }
+    $payload = json_decode(file_get_contents('php://input'), true) ?: [];
+    $csrf = (string)($payload['csrf'] ?? '');
+    if (!isset($_SESSION['csrf']) || !hash_equals($_SESSION['csrf'], $csrf)) {
+        http_response_code(403); echo json_encode(['ok'=>false,'error'=>'forbidden']); exit;
+    }
+    $plain = (string)($payload['pass'] ?? '');
+    if ($plain === '') { http_response_code(400); echo json_encode(['ok'=>false,'error'=>'empty']); exit; }
     $hash = password_hash($plain, PASSWORD_DEFAULT);
     echo json_encode(['ok'=>true,'hash'=>$hash], JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE);
     exit;
@@ -853,6 +869,8 @@ if (isset($_GET['gif_progress'])) {
     if ((int)$cfg['auth_mode'] === 2 && !auth_ok()) { http_response_code(401); echo json_encode(['ok'=>false,'error'=>'unauthorized']); exit; }
     $dirRel = trim(str_replace(['\\'],'/', ltrim($_GET['gif_progress'],'/')));
     if (strpos($dirRel,'..') !== false) { echo json_encode(['ok'=>false]); exit; }
+    // SECURITY: Reject excluded or hidden directories to avoid probing internal folders
+    if ($dirRel !== '' && is_excluded_dir(basename($dirRel), $dirRel)) { echo json_encode(['ok'=>false,'error'=>'excluded']); exit; }
     $ppath = folder_gif_progress_path($dirRel, $thumbsRoot, $prefThumb);
     if (!is_file($ppath)) { echo json_encode(['ok'=>true,'exists'=>false,'total'=>0,'done'=>0]); exit; }
     $data = @json_decode(@file_get_contents($ppath), true) ?: [];
@@ -873,7 +891,8 @@ if (isset($_GET['make_gif'])) {
     $dirRel = trim(str_replace(['\\'],'/', ltrim($_GET['make_gif'],'/')));
     if (strpos($dirRel,'..') !== false) { echo json_encode(['ok'=>false]); exit; }
     $srcAbs = realpath($baseDir . ($dirRel ? '/' . $dirRel : '')) ?: $baseDir;
-    if (strpos($srcAbs, realpath($baseDir)) !== 0) { echo json_encode(['ok'=>false]); exit; }
+    // SECURITY: Enforce directory boundary with trailing separator to prevent prefix confusion
+    if ($srcAbs !== $realBaseDir && strpos($srcAbs, $realBaseDir . DIRECTORY_SEPARATOR) !== 0) { echo json_encode(['ok'=>false]); exit; }
     // rifiuta se il target è escluso
     if ($dirRel !== '') {
         $last = basename($dirRel);
@@ -1207,6 +1226,8 @@ if (isset($_GET['purge_cache'])) {
 
     $targetRel = trim(str_replace(['\\'],'/', ltrim($_GET['dir'] ?? $relDir, '/')));
     if (strpos($targetRel,'..') !== false) { echo json_encode(['ok'=>false,'error'=>'bad_rel']); exit; }
+    // SECURITY: Reject excluded or hidden directories from being purged
+    if ($targetRel !== '' && is_excluded_dir(basename($targetRel), $targetRel)) { echo json_encode(['ok'=>false,'error'=>'excluded']); exit; }
     $recursive = !empty($payload['recursive']);
     $purged = ['thumbs'=>0,'gifs'=>0,'dirs'=>0];
 
@@ -1465,6 +1486,8 @@ if (isset($_GET['sync_cache'])) {
 
     $targetRel = trim(str_replace(['\\'],'/', ltrim($_GET['dir'] ?? $relDir, '/')));
     if (strpos($targetRel,'..') !== false) { echo json_encode(['ok'=>false,'error'=>'bad_rel']); exit; }
+    // SECURITY: Reject excluded or hidden directories from cache synchronization
+    if ($targetRel !== '' && is_excluded_dir(basename($targetRel), $targetRel)) { echo json_encode(['ok'=>false,'error'=>'excluded']); exit; }
     $recursive = isset($payload['recursive']) ? (bool)$payload['recursive'] : true;
 
     $sum=['removed_thumbs'=>0,'removed_gifs'=>0,'removed_dirs'=>0,'regen_thumbs'=>0,'regen_gifs'=>0,'created_thumbs'=>0,'indexed'=>0,'visited'=>0];
@@ -2195,14 +2218,14 @@ button { all:unset; }
   const folders = document.getElementById('folders');
   let idx = -1;
 
-  // Performance optimization (Bolt ⚡): Pre-instantiate Intl.Collator once for natural sorting.
-  // Calling String.prototype.localeCompare(..., {numeric:true}) in every comparator call recreates
-  // locale/options collation contexts internally, causing major CPU overhead in sort loops (~20x-30x speedup).
-  const nameCollator = (typeof Intl !== 'undefined' && Intl.Collator)
+  // Performance optimization (Bolt ⚡): Cache Intl.Collator for natural name sorting.
+  // Calling string.localeCompare() with options inside Array.prototype.sort creates a new Collator
+  // per comparison (O(N log N)), taking seconds on large galleries. Reusing a single Collator is ~25x faster.
+  const naturalCollator = (typeof Intl !== 'undefined' && Intl.Collator)
     ? new Intl.Collator(undefined, {numeric:true, sensitivity:'base'})
     : null;
-  const compareNaturalNames = (a, b) => nameCollator
-    ? nameCollator.compare(a, b)
+  const naturalCompare = (a, b) => naturalCollator
+    ? naturalCollator.compare(a, b)
     : a.localeCompare(b, undefined, {numeric:true, sensitivity:'base'});
 
   function applyPhotoSort(value) {
@@ -2214,8 +2237,8 @@ button { all:unset; }
         ? a.item.sortDate - b.item.sortDate
         : key === 'size'
           ? a.item.sortSize - b.item.sortSize
-          : compareNaturalNames(a.item.sortName, b.item.sortName);
-      return difference === 0 ? compareNaturalNames(a.item.sortName, b.item.sortName) : difference * multiplier;
+          : naturalCompare(a.item.sortName, b.item.sortName);
+      return difference === 0 ? naturalCompare(a.item.sortName, b.item.sortName) : difference * multiplier;
     });
     items.length = 0;
     sorted.forEach((entry, index) => {
@@ -2273,9 +2296,9 @@ button { all:unset; }
         let difference;
         if (key === 'count') difference = Number(a.dataset.imgs) - Number(b.dataset.imgs);
         else if (key === 'size') difference = Number(a.dataset.size) - Number(b.dataset.size);
-        else difference = compareNaturalNames(a.dataset.name, b.dataset.name);
+        else difference = naturalCompare(a.dataset.name, b.dataset.name);
         if (difference === 0 && key !== 'name') {
-          return compareNaturalNames(a.dataset.name, b.dataset.name);
+          return naturalCompare(a.dataset.name, b.dataset.name);
         }
         return difference * multiplier;
       });
@@ -2467,7 +2490,12 @@ syncBtn?.addEventListener('click', (e)=>{
     e.preventDefault();
     const pwd = prompt(L('hash_prompt'));
     if (!pwd) return;
-    fetch(withDir(`${window.__SELF__}?mkhash=${encodeURIComponent(pwd)}`), { cache:'no-store' })
+    fetch(`${window.__SELF__}?mkhash=1`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      cache: 'no-store',
+      body: JSON.stringify({ pass: pwd, csrf: window.__CSRF__ || '' })
+    })
       .then(r=>r.json())
       .then(d=>{
         if (d && d.ok && d.hash) {
