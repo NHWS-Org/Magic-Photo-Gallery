@@ -7,7 +7,7 @@ Just simply use my [docker image](https://github.com/napalmz/httpd-base), as sho
 
 ## Screenshots
 
-![Magic Photo Gallery screenshot](./screenshot.png)
+![Magic Photo Gallery with monochrome icons and photo sorting](./screenshot.png)
 
 Interface icons use monochrome, Material Design-inspired inline SVGs, with no external fonts or icon downloads. They inherit the surrounding text color; authentication indicators remain green (unlocked) or red (locked).
 
