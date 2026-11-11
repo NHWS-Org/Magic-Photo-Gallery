@@ -12,6 +12,8 @@ if (!headers_sent()) {
     header('Cross-Origin-Resource-Policy: same-origin');
     // SECURITY: Restrict Adobe Flash/Acrobat cross-domain policy files from granting unauthorized domain access
     header('X-Permitted-Cross-Domain-Policies: none');
+    // SECURITY: Content Security Policy (CSP) restricts resource loading, inline execution boundaries, framing, and form submissions (defense-in-depth against XSS and data exfiltration)
+    header("Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; frame-ancestors 'self'; base-uri 'self'; form-action 'self'; object-src 'none';");
 }
 
 // === CONFIGURAZIONE ===
