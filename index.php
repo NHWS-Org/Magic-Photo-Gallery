@@ -2061,11 +2061,11 @@ button { all:unset; }
             <?php echo mpg_icon('unlocked'); ?>
           </div>
         <?php endif; ?>
-        <button class="menu-btn" id="menuToggle" aria-haspopup="true" aria-expanded="false">
+        <button class="menu-btn" id="menuToggle" aria-haspopup="true" aria-expanded="false" aria-controls="userMenu-list">
           <?php echo mpg_icon('menu'); ?><span><?php echo htmlspecialchars(t('menu'),ENT_QUOTES); ?></span>
         </button>
       </div>
-      <div class="menu-list" role="menu" aria-label="<?php echo htmlspecialchars(t('menu'),ENT_QUOTES); ?>">
+      <div class="menu-list" id="userMenu-list" role="menu" aria-label="<?php echo htmlspecialchars(t('menu'),ENT_QUOTES); ?>">
         <?php if ((int)$cfg['auth_mode'] === 0): ?>
           <a href="#" id="purgeBtn" class="menu-item" role="menuitem" title="<?php echo htmlspecialchars(t('purge_t'),ENT_QUOTES); ?>">
             <?php echo mpg_icon('delete'); ?><span><?php echo htmlspecialchars(t('purge'),ENT_QUOTES); ?></span>
